@@ -32,8 +32,8 @@ jobs:
         run: npm install
 
       - name: Install backend dependencies
-        run: npm install
         working-directory: backend
+        run: npm install
 
       - name: Set DATABASE_URL for tests
         run: echo "DATABASE_URL=postgres://postgres:postgres@localhost:5432/hanabi_test" >> $GITHUB_ENV
@@ -42,14 +42,16 @@ jobs:
         run: |
           for i in {1..20}; do
             pg_isready -h localhost -p 5432 -U postgres && break
-            echo "Postgres not ready yet..."
+            echo "Postgres not ready..."
             sleep 2
           done
 
       - name: Apply schema
         run: |
-          psql "$DATABASE_URL" -f schema/schema.sql
-          psql "$DATABASE_URL" -f schema/sample_data.sql
+          psql "$DATABASE_URL" -f db/schema.sql
+          if [ -f db/sample_data.sql ]; then
+            psql "$DATABASE_URL" -f db/sample_data.sql
+          fi
 
       - name: Run ESLint
         run: npm run lint
