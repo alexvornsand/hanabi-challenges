@@ -35,8 +35,11 @@ jobs:
         working-directory: backend
         run: npm install
 
-      - name: Set DATABASE_URL for tests
-        run: echo "DATABASE_URL=postgres://postgres:postgres@localhost:5432/hanabi_test" >> $GITHUB_ENV
+      - name: Set environment variables for tests
+        run: |
+          echo "DATABASE_URL=postgres://postgres:postgres@localhost:5432/hanabi_test" >> $GITHUB_ENV
+          echo "JWT_SECRET=test_jwt_secret_for_ci" >> $GITHUB_ENV
+          echo "NODE_ENV=test" >> $GITHUB_ENV
 
       - name: Wait for Postgres
         run: |
