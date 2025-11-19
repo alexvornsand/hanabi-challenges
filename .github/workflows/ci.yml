@@ -2,35 +2,58 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [ "main" ]
   pull_request:
-    branches: [main]
+    branches: [ "main" ]
 
 jobs:
-  ci:
+  build:
     runs-on: ubuntu-latest
 
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+    services:
+      postgres:
+        image: postgres:15
+        ports:
+          - 5432:5432
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+          POSTGRES_DB: hanabi_test
+        options: >-
+          --health-cmd="pg_isready -U postgres -d hanabi_test"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=5
 
-      - name: Use Node.js 20
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
+    steps:
+      - uses: actions/checkout@v4
 
       - name: Install root dependencies
         run: npm install
 
-      - name: Lint
+      - name: Install backend dependencies
+        run: npm install
+        working-directory: backend
+
+      - name: Set DATABASE_URL for tests
+        run: echo "DATABASE_URL=postgres://postgres:postgres@localhost:5432/hanabi_test" >> $GITHUB_ENV
+
+      - name: Wait for Postgres
+        run: |
+          for i in {1..20}; do
+            pg_isready -h localhost -p 5432 -U postgres && break
+            echo "Postgres not ready yet..."
+            sleep 2
+          done
+
+      - name: Apply schema
+        run: |
+          psql "$DATABASE_URL" -f schema/schema.sql
+          psql "$DATABASE_URL" -f schema/sample_data.sql
+
+      - name: Run ESLint
         run: npm run lint
 
-      - name: Install backend dependencies
-        run: |
-          cd backend
-          npm install
-
       - name: Run backend tests
-        run: |
-          cd backend
-          npm test
+        working-directory: backend
+        run: npm test
