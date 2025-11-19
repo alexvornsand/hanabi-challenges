@@ -29,25 +29,25 @@ Prerequisites:
 
 Install dependencies:
 
-^^^bash
+```bash
 npm install
 cd backend
 npm install
-^^^
+```
 
 Lint and format:
 
-^^^bash
+```bash
 npm run lint
 npm run format
-^^^
+```
 
 Run backend tests:
 
-^^^bash
+```bash
 cd backend
 npm test
-^^^
+```
 
 ---
 
