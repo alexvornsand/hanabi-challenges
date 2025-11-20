@@ -17,11 +17,7 @@ describe('challenge.service (integration)', () => {
   const TEST_CHALLENGE_NAME = 'Unit Test Challenge';
   const TEST_CHALLENGE_SLUG = 'unit-test-challenge';
 
-  let testChallengeId: number | null = null;
-
   beforeEach(async () => {
-    // Reset only the tables this suite touches.
-    // Order + CASCADE handles FKs.
     await pool.query(
       `
       TRUNCATE
@@ -36,7 +32,6 @@ describe('challenge.service (integration)', () => {
       RESTART IDENTITY CASCADE;
       `,
     );
-    testChallengeId = null;
   });
 
   it('listChallenges returns the challenges inserted in this test', async () => {
@@ -80,12 +75,7 @@ describe('challenge.service (integration)', () => {
       VALUES ($1, $2, $3, $4)
       RETURNING id;
       `,
-      [
-        'Seed Test Challenge',
-        'seed-test-challenge',
-        'short',
-        'long description for seeds test',
-      ],
+      ['Seed Test Challenge', 'seed-test-challenge', 'short', 'long description for seeds test'],
     );
     const challengeId = challengeRes.rows[0].id as number;
 
@@ -118,16 +108,11 @@ describe('challenge.service (integration)', () => {
       VALUES ($1, $2, $3, $4)
       RETURNING id;
       `,
-      [
-        'Teams Test Challenge',
-        'teams-test-challenge',
-        'short',
-        'long description for teams test',
-      ],
+      ['Teams Test Challenge', 'teams-test-challenge', 'short', 'long description for teams test'],
     );
     const challengeId = challengeRes.rows[0].id as number;
 
-    const teamsRes = await pool.query(
+    await pool.query(
       `
       INSERT INTO teams (name, challenge_id)
       VALUES ($1, $2), ($3, $2)
@@ -135,8 +120,6 @@ describe('challenge.service (integration)', () => {
       `,
       ['Lanterns', challengeId, 'Clue Crew'],
     );
-    const lanternsId = teamsRes.rows[0].id as number;
-    const clueCrewId = teamsRes.rows[1].id as number;
 
     const teams = await listChallengeTeams(challengeId);
     const names = teams.map((t) => t.name);
@@ -157,7 +140,6 @@ describe('challenge.service (integration)', () => {
 
     expect(challenge.id).toBeGreaterThan(0);
     expect(challenge.name).toBe(TEST_CHALLENGE_NAME);
-    testChallengeId = challenge.id;
 
     const expectedError: ChallengeServiceErrorShape = {
       code: 'CHALLENGE_NAME_EXISTS',
@@ -181,16 +163,14 @@ describe('challenge.service (integration)', () => {
       long_description: 'seed parent long description',
     });
 
-    testChallengeId = challenge.id;
-
-    const seed = await createChallengeSeed(testChallengeId, {
+    const seed = await createChallengeSeed(challenge.id, {
       seed_number: 99,
       variant: 'UNIT',
       seed_payload: 'UNIT-TEST-SEED',
     });
 
     expect(seed.id).toBeGreaterThan(0);
-    expect(seed.challenge_id).toBe(testChallengeId);
+    expect(seed.challenge_id).toBe(challenge.id);
     expect(seed.seed_number).toBe(99);
 
     const expectedError: ChallengeServiceErrorShape = {
@@ -198,7 +178,7 @@ describe('challenge.service (integration)', () => {
     };
 
     await expect(
-      createChallengeSeed(testChallengeId, {
+      createChallengeSeed(challenge.id, {
         seed_number: 99,
         variant: 'UNIT',
         seed_payload: 'UNIT-TEST-SEED-2',

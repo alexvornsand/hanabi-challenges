@@ -1,11 +1,11 @@
 // src/routes/AppRoutes.tsx
-import React from "react";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { MainLayout } from "../layouts/MainLayout";
-import { LandingPage } from "../pages/LandingPage";
-import { ChallengeArchivePage } from "../pages/ChallengeArchivePage";
-import { ChallengeDetailPage } from "../pages/ChallengeDetailPage";
-import { NotFoundPage } from "../pages/NotFoundPage";
+import React from 'react';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { MainLayout } from '../layouts/MainLayout';
+import { LandingPage } from '../pages/LandingPage';
+import { ChallengeArchivePage } from '../pages/ChallengeArchivePage';
+import { ChallengeDetailPage } from '../pages/ChallengeDetailPage';
+import { NotFoundPage } from '../pages/NotFoundPage';
 
 export function AppRoutes() {
   return (

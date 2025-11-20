@@ -1,14 +1,14 @@
-version: "3.9"
+version: '3.9'
 
 services:
   db_test:
     image: postgres:16
     container_name: hanabi_db_test
-    restart: "no"
+    restart: 'no'
     environment:
       POSTGRES_DB: hanabi_test
       POSTGRES_USER: hanabi_user
       POSTGRES_PASSWORD: hanabi_password
     ports:
-      - "55432:5432"   # test DB listens on localhost:55432
+      - '55432:5432' # test DB listens on localhost:55432
     # No named volume -> ephemeral by default; we'll down -v after tests

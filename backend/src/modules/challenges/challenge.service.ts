@@ -70,7 +70,7 @@ export async function listChallenges(): Promise<Challenge[]> {
       ends_at
     FROM challenges
     ORDER BY starts_at NULLS LAST, id
-    `
+    `,
   );
 
   return result.rows;
@@ -96,11 +96,11 @@ export async function createChallenge(input: CreateChallengeInput) {
       VALUES ($1, $2, $3, $4, $5, $6)
       RETURNING id, name, slug, short_description, long_description, starts_at, ends_at, created_at;
       `,
-      [name, slug, short_description ?? null, long_description, starts_at, ends_at]
+      [name, slug, short_description ?? null, long_description, starts_at, ends_at],
     );
 
     return result.rows[0];
-  } catch (err: any) {
+  } catch (err) {
     if (err.code === '23505') {
       throw new ChallengeNameExistsError('Challenge name or slug must be unique');
     }
@@ -112,10 +112,9 @@ export async function createChallenge(input: CreateChallengeInput) {
  * Internal: Find challenge ID by slug
  * ----------------------------------------*/
 async function getChallengeIdBySlug(slug: string): Promise<number | null> {
-  const result = await pool.query<{ id: number }>(
-    `SELECT id FROM challenges WHERE slug = $1`,
-    [slug]
-  );
+  const result = await pool.query<{ id: number }>(`SELECT id FROM challenges WHERE slug = $1`, [
+    slug,
+  ]);
   return result.rowCount > 0 ? result.rows[0].id : null;
 }
 
@@ -136,7 +135,7 @@ export async function getChallengeBySlug(slug: string): Promise<ChallengeDetail 
     FROM challenges
     WHERE slug = $1
     `,
-    [slug]
+    [slug],
   );
 
   if (result.rowCount === 0) {
@@ -163,7 +162,7 @@ export async function listChallengeSeeds(challengeId: number): Promise<Challenge
     WHERE cs.challenge_id = $1
     ORDER BY cs.seed_number;
     `,
-    [challengeId]
+    [challengeId],
   );
 
   return result.rows;
@@ -187,7 +186,7 @@ export async function createChallengeSeed(
     seed_number: number;
     variant?: string | null;
     seed_payload?: string | null;
-  }
+  },
 ): Promise<ChallengeSeed> {
   const { seed_number, variant = null, seed_payload = null } = input;
 
@@ -198,11 +197,11 @@ export async function createChallengeSeed(
       VALUES ($1, $2, $3, $4)
       RETURNING id, challenge_id, seed_number, variant, seed_payload, created_at;
       `,
-      [challengeId, seed_number, variant, seed_payload]
+      [challengeId, seed_number, variant, seed_payload],
     );
 
     return result.rows[0];
-  } catch (err: any) {
+  } catch (err) {
     if (err.code === '23505') {
       throw new ChallengeSeedExistsError('Seed already exists for this challenge with that number');
     }
@@ -219,7 +218,7 @@ export async function createChallengeSeedBySlug(
     seed_number: number;
     variant?: string | null;
     seed_payload?: string | null;
-  }
+  },
 ): Promise<ChallengeSeed> {
   const challengeId = await getChallengeIdBySlug(slug);
   if (!challengeId) {
@@ -244,7 +243,7 @@ export async function listChallengeTeams(challengeId: number): Promise<Challenge
     WHERE t.challenge_id = $1
     ORDER BY t.id;
     `,
-    [challengeId]
+    [challengeId],
   );
 
   return result.rows;

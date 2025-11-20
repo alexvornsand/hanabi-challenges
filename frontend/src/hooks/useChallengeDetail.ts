@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { getJson, ApiError } from "../lib/api";
+import { useEffect, useState } from 'react';
+import { getJson, ApiError } from '../lib/api';
 
 export type ChallengeDetail = {
   id: number;
@@ -32,7 +32,7 @@ export function useChallengeDetail(slug: string | undefined) {
       setState({
         challenge: null,
         loading: false,
-        error: "No challenge specified",
+        error: 'No challenge specified',
         notFound: false,
       });
       return;
@@ -50,9 +50,7 @@ export function useChallengeDetail(slug: string | undefined) {
 
       try {
         // getJson will add /api → /api/challenges/:slug
-        const data = await getJson<ChallengeDetail>(
-          `/challenges/${encodeURIComponent(slug)}`
-        );
+        const data = await getJson<ChallengeDetail>(`/challenges/${encodeURIComponent(slug)}`);
 
         if (!cancelled) {
           setState({
@@ -73,11 +71,11 @@ export function useChallengeDetail(slug: string | undefined) {
             notFound: true,
           });
         } else {
-          console.error("Failed to load challenge", err);
+          console.error('Failed to load challenge', err);
           setState({
             challenge: null,
             loading: false,
-            error: "Failed to load challenge. Please try again.",
+            error: 'Failed to load challenge. Please try again.',
             notFound: false,
           });
         }

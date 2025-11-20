@@ -46,7 +46,7 @@ router.post('/', authRequired, requireAdmin, async (req: Request, res: Response)
     });
 
     res.status(201).json(challenge);
-  } catch (err: any) {
+  } catch (err) {
     if (err.code === 'CHALLENGE_NAME_EXISTS') {
       return res.status(409).json({ error: 'Challenge name must be unique' });
     }
@@ -80,7 +80,6 @@ router.get('/:slug', async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Failed to fetch challenge' });
   }
 });
-
 
 /* ------------------------------------------
  *  GET /api/challenges/:slug/seeds
@@ -116,10 +115,10 @@ router.post('/:slug/seeds', authRequired, requireAdmin, async (req: Request, res
     });
 
     res.status(201).json(seed);
-  } catch (err: any) {
+  } catch (err) {
     if (err.code === 'CHALLENGE_SEED_EXISTS') {
       return res.status(409).json({
-        error: 'Seed already exists for this challenge with that number'
+        error: 'Seed already exists for this challenge with that number',
       });
     }
     console.error('Error creating seed:', err);

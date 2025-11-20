@@ -1,6 +1,6 @@
-import { useParams } from "react-router-dom";
-import { NotFoundPage } from "./NotFoundPage";
-import { useChallengeDetail } from "../hooks/useChallengeDetail";
+import { useParams } from 'react-router-dom';
+import { NotFoundPage } from './NotFoundPage';
+import { useChallengeDetail } from '../hooks/useChallengeDetail';
 
 export function ChallengeDetailPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -56,7 +56,7 @@ export function ChallengeDetailPage() {
             {startsAt && <>Starts: {startsAt.toLocaleDateString()} </>}
             {endsAt && (
               <>
-                {startsAt && " · "}
+                {startsAt && ' · '}
                 Ends: {endsAt.toLocaleDateString()}
               </>
             )}
@@ -66,7 +66,7 @@ export function ChallengeDetailPage() {
 
       {challenge.long_description && (
         <section className="prose max-w-none">
-          {challenge.long_description.split("\n\n").map((block, idx) => (
+          {challenge.long_description.split('\n\n').map((block, idx) => (
             <p key={idx}>{block}</p>
           ))}
         </section>
