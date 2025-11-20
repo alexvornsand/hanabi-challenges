@@ -2,28 +2,13 @@ name: CI
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ['main']
   pull_request:
-    branches: [ "main" ]
+    branches: ['main']
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
-    services:
-      postgres:
-        image: postgres:15
-        ports:
-          - 5432:5432
-        env:
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_USER: postgres
-          POSTGRES_DB: hanabi_test
-        options: >-
-          --health-cmd="pg_isready -U postgres -d hanabi_test"
-          --health-interval=5s
-          --health-timeout=5s
-          --health-retries=5
 
     steps:
       - uses: actions/checkout@v4
@@ -37,28 +22,11 @@ jobs:
 
       - name: Set environment variables for tests
         run: |
-          echo "DATABASE_URL=postgres://postgres:postgres@localhost:5432/hanabi_test" >> $GITHUB_ENV
           echo "JWT_SECRET=test_jwt_secret_for_ci" >> $GITHUB_ENV
           echo "NODE_ENV=test" >> $GITHUB_ENV
-
-      - name: Wait for Postgres
-        run: |
-          for i in {1..20}; do
-            pg_isready -h localhost -p 5432 -U postgres && break
-            echo "Postgres not ready..."
-            sleep 2
-          done
-
-      - name: Apply schema
-        run: |
-          psql "$DATABASE_URL" -f db/schema.sql
-          if [ -f db/sample_data.sql ]; then
-            psql "$DATABASE_URL" -f db/sample_data.sql
-          fi
 
       - name: Run ESLint
         run: npm run lint
 
       - name: Run backend tests
-        working-directory: backend
-        run: npm test
+        run: ./scripts/test_run.sh
