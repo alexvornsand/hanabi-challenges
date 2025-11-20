@@ -1,45 +1,82 @@
-import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { NotFoundPage } from "./NotFoundPage";
+import { useChallengeDetail } from "../hooks/useChallengeDetail";
 
-export const ChallengeDetailPage: React.FC = () => {
-  const { challengeId } = useParams();
-  const [loading, setLoading] = useState(true);
-  const [exists, setExists] = useState<boolean | null>(null);
+export function ChallengeDetailPage() {
+  const { slug } = useParams<{ slug: string }>();
+  const { challenge, loading, error, notFound } = useChallengeDetail(slug);
 
-  // Temporary fake fetch to simulate existence
-  useEffect(() => {
-    let isNumber = false;
+  if (notFound) {
+    return <NotFoundPage />;
+  }
 
-    // Fake rule for now:
-    // - challenge "1" exists
-    // - challenge "2" exists
-    // - everything else -> doesn't exist
-    if (challengeId === "1" || challengeId === "2") {
-      isNumber = true;
-    }
+  if (loading) {
+    return (
+      <main className="p-4">
+        <p>Loading challenge...</p>
+      </main>
+    );
+  }
 
-    setExists(isNumber);
-    setLoading(false);
-  }, [challengeId]);
+  if (error && !challenge) {
+    return (
+      <main className="p-4">
+        <h1 className="text-xl font-semibold mb-2">Challenge</h1>
+        <p className="text-red-600">{error}</p>
+      </main>
+    );
+  }
 
-  if (loading) return <p>Loading…</p>;
-  if (exists === false) return <NotFoundPage />;
+  if (!challenge) {
+    return (
+      <main className="p-4">
+        <h1 className="text-xl font-semibold mb-2">Challenge not found</h1>
+      </main>
+    );
+  }
+
+  const startsAt = challenge.starts_at ? new Date(challenge.starts_at) : null;
+  const endsAt = challenge.ends_at ? new Date(challenge.ends_at) : null;
 
   return (
-    <div>
-      <h1>Challenge {challengeId}</h1>
-      <p>This is the details page for a valid challenge.</p>
+    <main className="p-4 space-y-4">
+      <header>
+        <h1 className="text-2xl font-bold">{challenge.name}</h1>
 
-      <section>
-        <h2>Teams in this challenge</h2>
-        <p>Eventually this will list teams for challenge {challengeId}.</p>
-      </section>
+        {challenge.short_description && (
+          <p className="text-gray-700 mt-1">{challenge.short_description}</p>
+        )}
 
-      <section>
-        <h2>Stats</h2>
-        <p>Later: challenge-level stats.</p>
+        <p className="text-sm text-gray-500 mt-1">
+          Slug: <code>{challenge.slug}</code>
+        </p>
+
+        {(startsAt || endsAt) && (
+          <p className="text-sm text-gray-600 mt-1">
+            {startsAt && <>Starts: {startsAt.toLocaleDateString()} </>}
+            {endsAt && (
+              <>
+                {startsAt && " · "}
+                Ends: {endsAt.toLocaleDateString()}
+              </>
+            )}
+          </p>
+        )}
+      </header>
+
+      {challenge.long_description && (
+        <section className="prose max-w-none">
+          {challenge.long_description.split("\n\n").map((block, idx) => (
+            <p key={idx}>{block}</p>
+          ))}
+        </section>
+      )}
+
+      <section className="mt-6 border-t pt-4">
+        <p className="text-sm text-gray-500">
+          Seeds, teams, and results summary will appear here later.
+        </p>
       </section>
-    </div>
+    </main>
   );
-};
+}

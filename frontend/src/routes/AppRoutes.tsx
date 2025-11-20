@@ -1,3 +1,4 @@
+// src/routes/AppRoutes.tsx
 import React from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { MainLayout } from "../layouts/MainLayout";
@@ -10,12 +11,17 @@ export function AppRoutes() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route element={<MainLayout />}>
-          <Route path="/" element={<LandingPage />} />
-          <Route path="/challenges" element={<ChallengeArchivePage />} />
-          <Route path="/challenges/:challengeId" element={<ChallengeDetailPage />} />
+        <Route path="/" element={<MainLayout />}>
+          {/* Home */}
+          <Route index element={<LandingPage />} />
 
-          {/* Catch-all for unknown paths */}
+          {/* Challenges */}
+          <Route path="challenges">
+            <Route index element={<ChallengeArchivePage />} />
+            <Route path=":slug" element={<ChallengeDetailPage />} />
+          </Route>
+
+          {/* Catch-all */}
           <Route path="*" element={<NotFoundPage />} />
         </Route>
       </Routes>
