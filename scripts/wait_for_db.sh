@@ -1,13 +1,19 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-HOST="${DB_HOST:-localhost}"
-PORT="${DB_PORT:-5432}"
+DB_HOST="${DB_HOST:-localhost}"
+DB_PORT="${DB_PORT:-5432}"
 
-echo "Waiting for Postgres at ${HOST}:${PORT}..."
+echo "Waiting for Postgres at ${DB_HOST}:${DB_PORT}..."
 
-while ! nc -z "${HOST}" "${PORT}"; do
+for i in {1..30}; do
+  if nc -z "${DB_HOST}" "${DB_PORT}" ; then
+    echo "Postgres is up."
+    exit 0
+  fi
+  echo "Postgres not ready..."
   sleep 1
 done
 
-echo "Postgres is up."
+echo "Postgres failed to start in time."
+exit 1

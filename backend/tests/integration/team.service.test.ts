@@ -1,5 +1,4 @@
-// backend/tests/unit/team.service.test.ts
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { pool } from '../../src/config/db';
 import {
   listTeamMembers,
@@ -13,52 +12,138 @@ interface TeamServiceErrorShape {
   code: string;
 }
 
-describe('team.service', () => {
-  const TEST_TEAM_NAME = 'Unit Test Team';
-  let testTeamId: number | null = null;
-
-  beforeAll(async () => {
-    // Clean up any leftover test team & memberships
-    const res = await pool.query('SELECT id FROM teams WHERE name = $1', [TEST_TEAM_NAME]);
-    if (res.rowCount > 0) {
-      const id = res.rows[0].id;
-      await pool.query('DELETE FROM team_memberships WHERE team_id = $1', [id]);
-      await pool.query('DELETE FROM team_enrollments WHERE team_id = $1', [id]);
-      await pool.query('DELETE FROM teams WHERE id = $1', [id]);
-    }
+describe('team.service (integration)', () => {
+  beforeEach(async () => {
+    await pool.query(
+      `
+      TRUNCATE
+        game_participants,
+        games,
+        challenge_seeds,
+        team_enrollments,
+        team_memberships,
+        teams,
+        challenges,
+        users
+      RESTART IDENTITY CASCADE;
+      `,
+    );
   });
 
-  afterAll(async () => {
-    if (testTeamId != null) {
-      await pool.query('DELETE FROM team_memberships WHERE team_id = $1', [testTeamId]);
-      await pool.query('DELETE FROM team_enrollments WHERE team_id = $1', [testTeamId]);
-      await pool.query('DELETE FROM teams WHERE id = $1', [testTeamId]);
+  async function seedUsers() {
+    const res = await pool.query(
+      `
+      INSERT INTO users (display_name, password_hash, role)
+      VALUES 
+        ('alice', 'dummy-hash', 'USER'),
+        ('bob',   'dummy-hash', 'USER'),
+        ('carol', 'dummy-hash', 'USER'),
+        ('dave',  'dummy-hash', 'USER'),
+        ('erin',  'dummy-hash', 'USER'),
+        ('frank', 'dummy-hash', 'USER'),
+        ('grace', 'dummy-hash', 'USER')
+      RETURNING id, display_name;
+      `,
+    );
+
+    const map = new Map<string, number>();
+    for (const row of res.rows) {
+      map.set(row.display_name as string, row.id as number);
     }
-  });
+    return map;
+  }
 
-  it('listTeamMembers returns expected members for Lanterns (team 1)', async () => {
-    const members = await listTeamMembers(1);
+  async function seedChallengeAndTeam(teamName: string) {
+    const challengeRes = await pool.query(
+      `
+      INSERT INTO challenges (name, slug, short_description, long_description)
+      VALUES ($1, $2, $3, $4)
+      RETURNING id;
+      `,
+      [
+        'Team Test Challenge',
+        'team-test-challenge',
+        'short desc',
+        'long description for team tests',
+      ],
+    );
+    const challengeId = challengeRes.rows[0].id as number;
 
-    expect(members.length).toBe(4); // alice (manager), bob, carol, dave
+    const teamRes = await pool.query(
+      `
+      INSERT INTO teams (name, challenge_id)
+      VALUES ($1, $2)
+      RETURNING id, name, challenge_id;
+      `,
+      [teamName, challengeId],
+    );
+
+    return {
+      challengeId,
+      teamId: teamRes.rows[0].id as number,
+    };
+  }
+
+  it('listTeamMembers returns expected members for a seeded team', async () => {
+    const userIds = await seedUsers();
+    const { teamId } = await seedChallengeAndTeam('Lanterns');
+
+    const aliceId = userIds.get('alice')!;
+    const bobId = userIds.get('bob')!;
+    const carolId = userIds.get('carol')!;
+    const daveId = userIds.get('dave')!;
+
+    await pool.query(
+      `
+      INSERT INTO team_memberships (team_id, user_id, role, is_listed)
+      VALUES 
+        ($1, $2, 'MANAGER', true),
+        ($1, $3, 'PLAYER',  true),
+        ($1, $4, 'PLAYER',  true),
+        ($1, $5, 'PLAYER',  true);
+      `,
+      [teamId, aliceId, bobId, carolId, daveId],
+    );
+
+    const members = await listTeamMembers(teamId);
+
+    expect(members.length).toBe(4);
 
     const names = members.map((m) => m.display_name).sort();
     expect(names).toEqual(['alice', 'bob', 'carol', 'dave'].sort());
   });
 
   it('createTeamWithCreator creates a team and MANAGER membership', async () => {
-    // Use challenge 1, created_by_user_id = bob (2)
-    const team = await createTeamWithCreator({
-      challenge_id: 1,
-      name: TEST_TEAM_NAME,
-      created_by_user_id: 2,
-    });
+    const userIds = await seedUsers();
 
-    testTeamId = team.id;
+    const challengeRes = await pool.query(
+      `
+      INSERT INTO challenges (name, slug, short_description, long_description)
+      VALUES ($1, $2, $3, $4)
+      RETURNING id;
+      `,
+      [
+        'Create Team Challenge',
+        'create-team-challenge',
+        'short desc',
+        'long description for create team test',
+      ],
+    );
+    const challengeId = challengeRes.rows[0].id as number;
+
+    const bobId = userIds.get('bob')!;
+    const TEST_TEAM_NAME = 'Unit Test Team';
+
+    const team = await createTeamWithCreator({
+      challenge_id: challengeId,
+      name: TEST_TEAM_NAME,
+      created_by_user_id: bobId,
+    });
 
     expect(team.id).toBeGreaterThan(0);
     expect(team.name).toBe(TEST_TEAM_NAME);
-    expect(team.challenge_id).toBe(1);
-    expect(team.created_by_user_id).toBe(2);
+    expect(team.challenge_id).toBe(challengeId);
+    expect(team.created_by_user_id).toBe(bobId);
 
     const membershipRes = await pool.query(
       `
@@ -66,7 +151,7 @@ describe('team.service', () => {
       FROM team_memberships
       WHERE team_id = $1 AND user_id = $2
       `,
-      [team.id, 2],
+      [team.id, bobId],
     );
 
     expect(membershipRes.rowCount).toBe(1);
@@ -74,32 +159,52 @@ describe('team.service', () => {
   });
 
   it('addTeamMember adds a member and rejects duplicate roles', async () => {
-    if (!testTeamId) {
-      throw new Error('Test team not created');
-    }
+    const userIds = await seedUsers();
 
-    // Add carol (3) as PLAYER to test team
+    const challengeRes = await pool.query(
+      `
+      INSERT INTO challenges (name, slug, short_description, long_description)
+      VALUES ($1, $2, $3, $4)
+      RETURNING id;
+      `,
+      [
+        'Add Member Challenge',
+        'add-member-challenge',
+        'short desc',
+        'long description for add member test',
+      ],
+    );
+    const challengeId = challengeRes.rows[0].id as number;
+
+    const bobId = userIds.get('bob')!;
+    const carolId = userIds.get('carol')!;
+
+    const team = await createTeamWithCreator({
+      challenge_id: challengeId,
+      name: 'Member Test Team',
+      created_by_user_id: bobId,
+    });
+
     const member = await addTeamMember({
-      team_id: testTeamId,
-      user_id: 3,
+      team_id: team.id,
+      user_id: carolId,
       role: 'PLAYER' as TeamRole,
       is_listed: true,
     });
 
-    expect(member.team_id).toBe(testTeamId);
-    expect(member.user_id).toBe(3);
+    expect(member.team_id).toBe(team.id);
+    expect(member.user_id).toBe(carolId);
     expect(member.role).toBe('PLAYER');
     expect(member.display_name).toBe('carol');
 
-    // Adding the same user with the same role again should fail
     const expectedError: TeamServiceErrorShape = {
       code: 'TEAM_MEMBER_EXISTS',
     };
 
     await expect(
       addTeamMember({
-        team_id: testTeamId,
-        user_id: 3,
+        team_id: team.id,
+        user_id: carolId,
         role: 'PLAYER' as TeamRole,
         is_listed: true,
       }),
@@ -107,17 +212,33 @@ describe('team.service', () => {
   });
 
   it('listMemberCandidates returns users not on the team and respects prefix search', async () => {
-    // For Lanterns (team 1), members are: alice(1), bob(2), carol(3), dave(4)
-    const allCandidates = await listMemberCandidates(1, null);
+    const userIds = await seedUsers();
+    const { teamId } = await seedChallengeAndTeam('Lanterns');
 
+    const aliceId = userIds.get('alice')!;
+    const bobId = userIds.get('bob')!;
+    const carolId = userIds.get('carol')!;
+    const daveId = userIds.get('dave')!;
+
+    await pool.query(
+      `
+      INSERT INTO team_memberships (team_id, user_id, role, is_listed)
+      VALUES
+        ($1, $2, 'MANAGER', true),
+        ($1, $3, 'PLAYER',  true),
+        ($1, $4, 'PLAYER',  true),
+        ($1, $5, 'PLAYER',  true);
+      `,
+      [teamId, aliceId, bobId, carolId, daveId],
+    );
+
+    const allCandidates = await listMemberCandidates(teamId, null);
     const allNames = allCandidates.map((c) => c.display_name).sort();
-    // From sample_data: users are alice, bob, carol, dave, erin, frank, grace
-    // Candidates should include erin, frank, grace but not the existing members
+
     expect(allNames).toEqual(['erin', 'frank', 'grace'].sort());
 
-    // Prefix search: "e" should only return erin
-    const eCandidates = await listMemberCandidates(1, 'e');
-    const eNames = eCandidates.map((c) => c.display_name);
+    const eCandidates = await listMemberCandidates(teamId, 'e');
+    const eNames = eCandidates.map((c) => c.display_name).sort();
     expect(eNames).toEqual(['erin']);
   });
 });

@@ -1,5 +1,4 @@
-// backend/tests/unit/result.service.test.ts
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { pool } from '../../src/config/db';
 import {
   createGameResult,
@@ -11,70 +10,162 @@ interface GameResultErrorShape {
   code: string;
 }
 
-describe('result.service (games)', () => {
-  let testSeedId: number | null = null;
-
-  beforeAll(async () => {
-    // Clean up any leftover unit-test seed
-    const res = await pool.query(
-      "SELECT id FROM challenge_seeds WHERE seed_payload = 'UNIT-TEST-GAME-SEED'",
-    );
-    if (res.rowCount > 0) {
-      const id = res.rows[0].id;
-      await pool.query('DELETE FROM games WHERE seed_id = $1', [id]);
-      await pool.query('DELETE FROM challenge_seeds WHERE id = $1', [id]);
-    }
-
-    // Insert fresh seed for challenge 1 with seed_number 99
-    const insert = await pool.query(
+describe('result.service (games, integration)', () => {
+  beforeEach(async () => {
+    await pool.query(
       `
-      INSERT INTO challenge_seeds (challenge_id, seed_number, variant, seed_payload)
-      VALUES (1, 99, 'NO_VARIANT', 'UNIT-TEST-GAME-SEED')
-      RETURNING id;
+      TRUNCATE
+        game_participants,
+        games,
+        challenge_seeds,
+        team_enrollments,
+        team_memberships,
+        teams,
+        challenges,
+        users
+      RESTART IDENTITY CASCADE;
       `,
     );
-    testSeedId = insert.rows[0].id;
   });
 
-  afterAll(async () => {
-    if (testSeedId != null) {
-      await pool.query('DELETE FROM games WHERE seed_id = $1', [testSeedId]);
-      await pool.query('DELETE FROM challenge_seeds WHERE id = $1', [testSeedId]);
-    }
-  });
+  async function setupChallengeSeedTeamAndUsers() {
+    // Challenge
+    const challengeRes = await pool.query(
+      `
+      INSERT INTO challenges (name, slug, short_description, long_description)
+      VALUES ($1, $2, $3, $4)
+      RETURNING id;
+      `,
+      [
+        'Result Test Challenge',
+        'result-test-challenge',
+        'short desc',
+        'long description for result tests',
+      ],
+    );
+    const challengeId = challengeRes.rows[0].id as number;
+
+    // Seed
+    const seedRes = await pool.query(
+      `
+      INSERT INTO challenge_seeds (challenge_id, seed_number, variant, seed_payload)
+      VALUES ($1, $2, $3, $4)
+      RETURNING id, seed_number;
+      `,
+      [challengeId, 1, 'NO_VARIANT', 'RESULT-TEST-SEED-1'],
+    );
+    const seedId = seedRes.rows[0].id as number;
+    const seedNumber = seedRes.rows[0].seed_number as number;
+
+    // Team
+    const teamRes = await pool.query(
+      `
+      INSERT INTO teams (name, challenge_id)
+      VALUES ($1, $2)
+      RETURNING id, name;
+      `,
+      ['Lanterns', challengeId],
+    );
+    const teamId = teamRes.rows[0].id as number;
+    const teamName = teamRes.rows[0].name as string;
+
+    // Users / players
+    const playersRes = await pool.query(
+      `
+      INSERT INTO users (display_name, password_hash, role)
+      VALUES
+        ('bob',   'dummy-hash', 'USER'),
+        ('carol', 'dummy-hash', 'USER'),
+        ('dave',  'dummy-hash', 'USER')
+      RETURNING id, display_name;
+      `,
+    );
+    const playerIds = playersRes.rows.map((r) => r.id as number);
+    const playerNames = playersRes.rows.map((r) => r.display_name as string);
+
+    // Team enrollment — no challenge_id column here
+    const enrollmentRes = await pool.query(
+      `
+      INSERT INTO team_enrollments (team_id, player_count)
+      VALUES ($1, $2)
+      RETURNING id, player_count;
+      `,
+      [teamId, playerIds.length],
+    );
+    const teamEnrollmentId = enrollmentRes.rows[0].id as number;
+    const playerCount = enrollmentRes.rows[0].player_count as number;
+
+    return {
+      challengeId,
+      seedId,
+      seedNumber,
+      teamEnrollmentId,
+      teamName,
+      playerIds,
+      playerNames,
+      playerCount,
+    };
+  }
 
   it('getGameResultById returns hydrated result for an existing game', async () => {
-    // From sample_data:
-    // game_id (PK) 1 is Lanterns 3p, challenge 1, seed_id 1, score 25, zero_reason NULL
-    const detail = await getGameResultById(1);
+    const {
+      challengeId,
+      seedId,
+      seedNumber,
+      teamEnrollmentId,
+      teamName,
+      playerIds,
+      playerNames,
+      playerCount,
+    } = await setupChallengeSeedTeamAndUsers();
+
+    // Create a game using the service under test
+    const created = await createGameResult({
+      team_enrollment_id: teamEnrollmentId,
+      seed_id: seedId,
+      game_id: 1234,
+      score: 25,
+      zero_reason: null,
+      bottom_deck_risk: 3,
+      notes: 'Hydration test game',
+      played_at: '2030-01-01T20:00:00Z',
+    });
+
+    // Seed participants directly into game_participants
+    for (const userId of playerIds) {
+      await pool.query(
+        `
+        INSERT INTO game_participants (game_id, user_id)
+        VALUES ($1, $2);
+        `,
+        [created.id, userId],
+      );
+    }
+
+    const detail = await getGameResultById(created.id);
 
     expect(detail).not.toBeNull();
-    if (!detail) return; // TS narrow
+    if (!detail) return;
 
-    expect(detail.id).toBe(1);
+    expect(detail.id).toBe(created.id);
     expect(detail.score).toBe(25);
     expect(detail.zero_reason).toBeNull();
 
-    // Hydrated fields
-    expect(detail.challenge_id).toBe(1);
-    expect(detail.seed_number).toBe(1);
-    expect(detail.team_name).toBe('Lanterns');
-    expect(detail.player_count).toBe(3);
+    expect(detail.challenge_id).toBe(challengeId);
+    expect(detail.seed_number).toBe(seedNumber);
+    expect(detail.team_name).toBe(teamName);
+    expect(detail.player_count).toBe(playerCount);
 
-    // Players should include bob, carol, dave (order not important)
     const playersSorted = [...detail.players].sort();
-    expect(playersSorted).toEqual(['bob', 'carol', 'dave'].sort());
+    expect(playersSorted).toEqual(playerNames.slice().sort());
   });
 
   it('createGameResult inserts a new game record for a fresh (team_enrollment, seed) pair', async () => {
-    if (!testSeedId) {
-      throw new Error('Test seed not created');
-    }
+    const { seedId, teamEnrollmentId } = await setupChallengeSeedTeamAndUsers();
 
-    // Use team_enrollment_id 1 (Lanterns 3p) with our new seed 99
     const row = await createGameResult({
-      team_enrollment_id: 1,
-      seed_id: testSeedId,
+      team_enrollment_id: teamEnrollmentId,
+      seed_id: seedId,
       game_id: 9999,
       score: 19,
       zero_reason: 'Time Out' as ZeroReason,
@@ -84,8 +175,8 @@ describe('result.service (games)', () => {
     });
 
     expect(row.id).toBeGreaterThan(0);
-    expect(row.team_enrollment_id).toBe(1);
-    expect(row.seed_id).toBe(testSeedId);
+    expect(row.team_enrollment_id).toBe(teamEnrollmentId);
+    expect(row.seed_id).toBe(seedId);
     expect(row.score).toBe(19);
     expect(row.zero_reason).toBe('Time Out');
     expect(row.bottom_deck_risk).toBe(4);
@@ -106,21 +197,27 @@ describe('result.service (games)', () => {
   });
 
   it('createGameResult rejects duplicate (team_enrollment, seed) with GAME_RESULT_EXISTS', async () => {
-    if (!testSeedId) {
-      throw new Error('Test seed not created');
-    }
+    const { seedId, teamEnrollmentId } = await setupChallengeSeedTeamAndUsers();
 
-    // We already created a game for (1, testSeedId) in the previous test.
+    const first = await createGameResult({
+      team_enrollment_id: teamEnrollmentId,
+      seed_id: seedId,
+      game_id: 10001,
+      score: 10,
+      zero_reason: null,
+    });
+    expect(first.id).toBeGreaterThan(0);
+
     const expectedError: GameResultErrorShape = {
       code: 'GAME_RESULT_EXISTS',
     };
 
     await expect(
       createGameResult({
-        team_enrollment_id: 1,
-        seed_id: testSeedId,
-        game_id: 10000,
-        score: 10,
+        team_enrollment_id: teamEnrollmentId,
+        seed_id: seedId,
+        game_id: 10002,
+        score: 5,
         zero_reason: null,
       }),
     ).rejects.toMatchObject(expectedError);

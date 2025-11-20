@@ -1,5 +1,4 @@
-// backend/tests/unit/challenge.service.test.ts
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { pool } from '../../src/config/db';
 import {
   listChallenges,
@@ -14,64 +13,139 @@ interface ChallengeServiceErrorShape {
   code: string;
 }
 
-describe('challenge.service', () => {
+describe('challenge.service (integration)', () => {
   const TEST_CHALLENGE_NAME = 'Unit Test Challenge';
+  const TEST_CHALLENGE_SLUG = 'unit-test-challenge';
+
   let testChallengeId: number | null = null;
-  let testSeedId: number | null = null;
 
-  beforeAll(async () => {
-    // Clean up any leftovers from prior runs
-    const seedRes = await pool.query(
-      "DELETE FROM challenge_seeds WHERE seed_payload = 'UNIT-TEST-SEED' RETURNING challenge_id",
+  beforeEach(async () => {
+    // Reset only the tables this suite touches.
+    // Order + CASCADE handles FKs.
+    await pool.query(
+      `
+      TRUNCATE
+        games,
+        game_participants,
+        challenge_seeds,
+        team_enrollments,
+        team_memberships,
+        teams,
+        challenges,
+        users
+      RESTART IDENTITY CASCADE;
+      `,
     );
-    if (seedRes.rowCount > 0) {
-      testChallengeId = seedRes.rows[0].challenge_id;
-    }
-    await pool.query('DELETE FROM challenges WHERE name = $1', [TEST_CHALLENGE_NAME]);
+    testChallengeId = null;
   });
 
-  afterAll(async () => {
-    if (testSeedId != null) {
-      await pool.query('DELETE FROM challenge_seeds WHERE id = $1', [testSeedId]);
-    }
-    await pool.query('DELETE FROM challenges WHERE name = $1', [TEST_CHALLENGE_NAME]);
-  });
+  it('listChallenges returns the challenges inserted in this test', async () => {
+    const now = new Date().toISOString();
 
-  it('listChallenges returns the seeded challenges', async () => {
+    await pool.query(
+      `
+      INSERT INTO challenges (name, slug, short_description, long_description, starts_at, ends_at)
+      VALUES 
+        ($1, $2, $3, $4, $5, $6),
+        ($7, $8, $9, $10, $11, $12);
+      `,
+      [
+        'No Variant 2025',
+        'no-variant-2025',
+        'short 2025',
+        'long 2025',
+        now,
+        now,
+        'No Variant 2026',
+        'no-variant-2026',
+        'short 2026',
+        'long 2026',
+        now,
+        now,
+      ],
+    );
+
     const challenges = await listChallenges();
-
-    // We know sample_data.sql created these two:
     const names = challenges.map((c) => c.name);
 
     expect(names).toContain('No Variant 2025');
     expect(names).toContain('No Variant 2026');
-    expect(challenges.length).toBeGreaterThanOrEqual(2);
+    expect(challenges.length).toBe(2);
   });
 
-  it('listChallengeSeeds returns at least the 5 base seeds for challenge 1', async () => {
-    const seeds = await listChallengeSeeds(1);
+  it('listChallengeSeeds returns the seeds for the given challenge', async () => {
+    const challengeRes = await pool.query(
+      `
+      INSERT INTO challenges (name, slug, short_description, long_description)
+      VALUES ($1, $2, $3, $4)
+      RETURNING id;
+      `,
+      [
+        'Seed Test Challenge',
+        'seed-test-challenge',
+        'short',
+        'long description for seeds test',
+      ],
+    );
+    const challengeId = challengeRes.rows[0].id as number;
 
-    // We know 5 base seeds exist; tests may add more (like seed_number 99)
-    expect(seeds.length).toBeGreaterThanOrEqual(5);
+    await pool.query(
+      `
+      INSERT INTO challenge_seeds (challenge_id, seed_number, variant, seed_payload)
+      VALUES 
+        ($1, 1, 'BASE', 'SEED-1'),
+        ($1, 2, 'BASE', 'SEED-2'),
+        ($1, 3, 'BASE', 'SEED-3'),
+        ($1, 4, 'BASE', 'SEED-4'),
+        ($1, 5, 'BASE', 'SEED-5');
+      `,
+      [challengeId],
+    );
 
+    const seeds = await listChallengeSeeds(challengeId);
     const payloads = seeds.map((s) => s.seed_payload);
+
+    expect(seeds.length).toBe(5);
     expect(payloads).toEqual(
-      expect.arrayContaining(['NVC2025-1', 'NVC2025-2', 'NVC2025-3', 'NVC2025-4', 'NVC2025-5']),
+      expect.arrayContaining(['SEED-1', 'SEED-2', 'SEED-3', 'SEED-4', 'SEED-5']),
     );
   });
 
-  it('listChallengeTeams returns the teams for challenge 1', async () => {
-    const teams = await listChallengeTeams(1);
+  it('listChallengeTeams returns the teams for the given challenge', async () => {
+    const challengeRes = await pool.query(
+      `
+      INSERT INTO challenges (name, slug, short_description, long_description)
+      VALUES ($1, $2, $3, $4)
+      RETURNING id;
+      `,
+      [
+        'Teams Test Challenge',
+        'teams-test-challenge',
+        'short',
+        'long description for teams test',
+      ],
+    );
+    const challengeId = challengeRes.rows[0].id as number;
 
+    const teamsRes = await pool.query(
+      `
+      INSERT INTO teams (name, challenge_id)
+      VALUES ($1, $2), ($3, $2)
+      RETURNING id, name;
+      `,
+      ['Lanterns', challengeId, 'Clue Crew'],
+    );
+    const lanternsId = teamsRes.rows[0].id as number;
+    const clueCrewId = teamsRes.rows[1].id as number;
+
+    const teams = await listChallengeTeams(challengeId);
     const names = teams.map((t) => t.name);
+
     expect(names).toContain('Lanterns');
     expect(names).toContain('Clue Crew');
   });
 
   it('createChallenge inserts a new challenge and rejects duplicates', async () => {
-    const TEST_CHALLENGE_SLUG = 'unit-test-challenge';
-
-    // First create should succeed
     const challenge = await createChallenge({
       name: TEST_CHALLENGE_NAME,
       slug: TEST_CHALLENGE_SLUG,
@@ -99,16 +173,50 @@ describe('challenge.service', () => {
     ).rejects.toMatchObject(expectedError);
   });
 
-  //
-  // NEW TESTS: getChallengeBySlug
-  //
+  it('createChallengeSeed inserts a new seed and rejects duplicates', async () => {
+    const challenge = await createChallenge({
+      name: TEST_CHALLENGE_NAME,
+      slug: TEST_CHALLENGE_SLUG,
+      short_description: 'seed parent',
+      long_description: 'seed parent long description',
+    });
 
-  it('getChallengeBySlug returns a seeded challenge by slug', async () => {
-    // IMPORTANT: ensure this slug matches your sample_data.sql
-    // e.g. if you seeded:
-    //   slug = 'no-var-2025' for "No Variant 2025"
-    // then set this constant accordingly.
+    testChallengeId = challenge.id;
+
+    const seed = await createChallengeSeed(testChallengeId, {
+      seed_number: 99,
+      variant: 'UNIT',
+      seed_payload: 'UNIT-TEST-SEED',
+    });
+
+    expect(seed.id).toBeGreaterThan(0);
+    expect(seed.challenge_id).toBe(testChallengeId);
+    expect(seed.seed_number).toBe(99);
+
+    const expectedError: ChallengeServiceErrorShape = {
+      code: 'CHALLENGE_SEED_EXISTS',
+    };
+
+    await expect(
+      createChallengeSeed(testChallengeId, {
+        seed_number: 99,
+        variant: 'UNIT',
+        seed_payload: 'UNIT-TEST-SEED-2',
+      }),
+    ).rejects.toMatchObject(expectedError);
+  });
+
+  it('getChallengeBySlug returns a challenge created in this test', async () => {
+    const now = new Date().toISOString();
     const slug = 'no-var-2025';
+
+    await pool.query(
+      `
+      INSERT INTO challenges (name, slug, short_description, long_description, starts_at, ends_at)
+      VALUES ($1, $2, $3, $4, $5, $6);
+      `,
+      ['No Variant 2025', slug, 'short desc', 'Long description text', now, now],
+    );
 
     const challenge = await getChallengeBySlug(slug);
 
@@ -120,7 +228,6 @@ describe('challenge.service', () => {
 
   it('getChallengeBySlug returns null when slug does not exist', async () => {
     const challenge = await getChallengeBySlug('this-slug-does-not-exist');
-
     expect(challenge).toBeNull();
   });
 });

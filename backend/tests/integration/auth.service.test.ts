@@ -1,19 +1,14 @@
-// backend/tests/unit/auth.service.test.ts
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { pool } from '../../src/config/db';
 import { loginOrCreateUser } from '../../src/modules/auth/auth.service';
 
-describe('loginOrCreateUser', () => {
+describe('loginOrCreateUser (integration)', () => {
   const TEST_DISPLAY_NAME = 'unit_test_user';
 
-  // Make sure we start clean for our test user
-  beforeAll(async () => {
-    await pool.query('DELETE FROM users WHERE display_name = $1', [TEST_DISPLAY_NAME]);
-  });
-
-  // And clean up afterward so repeated runs don't fail on unique constraint
-  afterAll(async () => {
-    await pool.query('DELETE FROM users WHERE display_name = $1', [TEST_DISPLAY_NAME]);
+  // Ensure each test starts from a clean users table
+  beforeEach(async () => {
+    // If there are FKs referencing users, CASCADE is helpful
+    await pool.query('TRUNCATE users RESTART IDENTITY CASCADE;');
   });
 
   it('creates a new user when display_name does not exist', async () => {
@@ -25,32 +20,43 @@ describe('loginOrCreateUser', () => {
     expect(typeof result.token).toBe('string');
     expect(result.token.length).toBeGreaterThan(0);
 
-    // Optionally, verify it really hit the DB
+    // Verify it really hit the DB, using only the user we just created
     const dbCheck = await pool.query(
       'SELECT display_name, role FROM users WHERE display_name = $1',
       [TEST_DISPLAY_NAME],
     );
     expect(dbCheck.rowCount).toBe(1);
+    expect(dbCheck.rows[0].display_name).toBe(TEST_DISPLAY_NAME);
     expect(dbCheck.rows[0].role).toBe('USER');
   });
 
   it('logs in an existing user with correct password', async () => {
-    // alice is in sample_data.sql with password "alicepw"
-    const result = await loginOrCreateUser('alice', 'alicepw');
+    const displayName = 'login_user';
 
-    expect(result.mode).toBe('login');
-    expect(result.user.display_name).toBe('alice');
-    expect(result.user.role).toBe('SUPERADMIN'); // from sample_data.sql
-    expect(typeof result.token).toBe('string');
-    expect(result.token.length).toBeGreaterThan(0);
+    // Arrange: create the user via the same service
+    const firstCall = await loginOrCreateUser(displayName, 'correctpw');
+    expect(firstCall.mode).toBe('created');
+
+    // Act: call again with same credentials
+    const secondCall = await loginOrCreateUser(displayName, 'correctpw');
+
+    // Assert: now it should be a login, not a create
+    expect(secondCall.mode).toBe('login');
+    expect(secondCall.user.display_name).toBe(displayName);
+    expect(typeof secondCall.token).toBe('string');
+    expect(secondCall.token.length).toBeGreaterThan(0);
   });
 
   it('throws INVALID_CREDENTIALS error when password is wrong', async () => {
-    // alice exists, but we pass the wrong password
-    await expect(loginOrCreateUser('alice', 'wrong-password')).rejects.toMatchObject({
+    const displayName = 'wrong_password_user';
+
+    // Arrange: create the user with a known password
+    const created = await loginOrCreateUser(displayName, 'correctpw');
+    expect(created.mode).toBe('created');
+
+    // Act + Assert: wrong password should reject with INVALID_CREDENTIALS
+    await expect(loginOrCreateUser(displayName, 'wrong-password')).rejects.toMatchObject({
       message: 'Invalid credentials',
-      // our service sets error.code = "INVALID_CREDENTIALS"
-      // but TS doesn't know about it; we still assert it here:
       code: 'INVALID_CREDENTIALS',
     } as { message: string; code: string });
   });

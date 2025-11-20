@@ -8,7 +8,7 @@ DB_NAME="${DB_NAME:-hanabi_test}"
 DB_USER="${DB_USER:-hanabi_user}"
 DB_PASSWORD="${DB_PASSWORD:-hanabi_password}"
 
-SCHEMA_FILE="${ROOT_DIR}/backend/schema/schema.sql"
+SCHEMA_FILE="${ROOT_DIR}/db/schema.sql"
 
 if [ ! -f "${SCHEMA_FILE}" ]; then
   echo "Schema file not found at ${SCHEMA_FILE}"
@@ -16,16 +16,41 @@ if [ ! -f "${SCHEMA_FILE}" ]; then
 fi
 
 echo "🧪 Starting test database container..."
-docker compose -f "${ROOT_DIR}/docker-compose.test.yml" up -d db_test
+docker compose -f "${ROOT_DIR}/docker-compose.test.yml" -p hanabi-tests up -d db_test
 
-echo "⏳ Waiting for test Postgres to be ready on localhost:55432..."
-# reuse your existing wait_for_db.sh, but point it at port 55432
-DB_HOST=localhost DB_PORT=55432 "${ROOT_DIR}/scripts/wait_for_db.sh"
+# We now use a helper postgres:16 container on the same network to:
+# 1) wait for Postgres inside the network
+# 2) apply the schema using psql inside that helper container
+echo "⏳ Waiting for Postgres (from helper container) and applying schema..."
 
-echo "📜 Applying schema to test database..."
-docker exec -i \
+docker run --rm \
+  --network hanabi-tests_default \
+  -v "${SCHEMA_FILE}":/schema/schema.sql:ro \
   -e PGPASSWORD="${DB_PASSWORD}" \
-  "${DB_CONTAINER_NAME}" \
-  psql -U "${DB_USER}" -d "${DB_NAME}" < "${SCHEMA_FILE}"
+  -e DB_HOST="${DB_CONTAINER_NAME}" \
+  -e DB_PORT=5432 \
+  -e DB_USER="${DB_USER}" \
+  -e DB_NAME="${DB_NAME}" \
+  postgres:16 \
+  bash -lc '
+    echo "Waiting for Postgres at ${DB_HOST}:${DB_PORT}..."
+    for i in {1..30}; do
+      if pg_isready -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" > /dev/null 2>&1; then
+        echo "Postgres is ready."
+        break
+      fi
+      echo "Postgres not ready yet..."
+      sleep 1
+    done
+
+    echo "📜 Applying schema from /schema/schema.sql..."
+    psql \
+      -h "${DB_HOST}" \
+      -p "${DB_PORT}" \
+      -U "${DB_USER}" \
+      -d "${DB_NAME}" \
+      -v ON_ERROR_STOP=1 \
+      -f /schema/schema.sql
+  '
 
 echo "✅ Test database is ready (schema applied)."

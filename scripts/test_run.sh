@@ -9,7 +9,7 @@ COMPOSE_FILE="${ROOT_DIR}/docker-compose.test.yml"
 # Stops container on exit (even if tests fail)
 cleanup() {
   echo "🧹 Cleaning up test DB container..."
-  docker compose -f "$COMPOSE_FILE" down -v || true
+  docker compose -f "$COMPOSE_FILE" -p hanabi-tests down -v || true
 }
 trap cleanup EXIT
 
