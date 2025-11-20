@@ -54,14 +54,14 @@ unit/
 
 The system uses PostgreSQL. Core tables include:
 
-- `users`  
-- `challenges`  
-- `challenge_seeds`  
-- `teams`  
-- `team_memberships`  
-- `team_enrollments` (team + challenge participation)  
-- `games`  
-- `game_participants`  
+- `users`
+- `challenges`
+- `challenge_seeds`
+- `teams`
+- `team_memberships`
+- `team_enrollments` (team + challenge participation)
+- `games`
+- `game_participants`
 
 ### 3.1 Relationships (Simplified)
 
@@ -136,7 +136,7 @@ Domain objects:
 Responsibilities:
 
 - Insert game results (with error-handling on duplicates)
-- Fetch *hydrated* game results:
+- Fetch _hydrated_ game results:
   - Seed
   - Team
   - Team player count
@@ -161,10 +161,9 @@ Unit tests exist in:
 backend/tests/unit/*.test.ts
 ```
 
-
 Testing style:
 
-- Each service method tested against a *real* test database
+- Each service method tested against a _real_ test database
 - Cleanup performed before/after each test suite
 - Domain errors asserted via `toMatchObject({ code: … })`
 - Hydrated results checked for correct joining logic

@@ -24,6 +24,7 @@ evolve over time.
 ## Development Setup
 
 Prerequisites:
+
 - Node 20+
 - PostgreSQL running with schema + sample data
 
