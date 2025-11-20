@@ -5,9 +5,9 @@ instances, tracking teams, and recording game results.
 
 ## Project Structure
 
-- backend/ – Node + TypeScript API (Express), PostgreSQL, Vitest tests  
-- tests/ – Unit tests live under backend/tests  
-- config/ – Database configuration and connection pool  
+- backend/ – Node + TypeScript API (Express), PostgreSQL, Vitest tests
+- tests/ – Unit tests live under backend/tests
+- config/ – Database configuration and connection pool
 
 (Frontend to be added later.)
 
