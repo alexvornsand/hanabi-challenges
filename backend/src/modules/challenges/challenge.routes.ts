@@ -7,7 +7,9 @@ import {
   listChallengeSeeds,
   createChallengeSeed,
   listChallengeTeams,
+  getChallengeBySlug,
 } from './challenge.service';
+
 
 const router = Router();
 
@@ -24,17 +26,29 @@ router.get('/', async (_req: Request, res: Response) => {
 
 // POST /api/challenges (ADMIN or SUPERADMIN)
 router.post('/', authRequired, requireAdmin, async (req: Request, res: Response) => {
-  const { name, description, starts_at, ends_at } = req.body;
+  const { name, slug, short_description, long_description, starts_at, ends_at } = req.body;
 
   if (!name) {
     res.status(400).json({ error: 'name is required' });
     return;
   }
 
+  if (!slug) {
+    res.status(400).json({ error: 'slug is required' });
+    return;
+  }
+
+  if (!long_description) {
+    res.status(400).json({ error: 'long_description is required' });
+    return;
+  }
+
   try {
     const challenge = await createChallenge({
       name,
-      description: description ?? null,
+      slug,
+      short_description: short_description ?? null,
+      long_description,
       starts_at: starts_at ?? null,
       ends_at: ends_at ?? null,
     });
@@ -120,6 +134,30 @@ router.get('/:id/teams', async (req: Request, res: Response) => {
   } catch (err) {
     console.error('Error fetching teams:', err);
     res.status(500).json({ error: 'Failed to fetch teams' });
+  }
+});
+
+// GET /api/challenges/slug/:slug
+router.get('/slug/:slug', async (req: Request, res: Response) => {
+  const { slug } = req.params;
+
+  if (!slug) {
+    res.status(400).json({ error: 'slug is required' });
+    return;
+  }
+
+  try {
+    const challenge = await getChallengeBySlug(slug);
+
+    if (!challenge) {
+      res.status(404).json({ error: 'Challenge not found' });
+      return;
+    }
+
+    res.json(challenge);
+  } catch (err) {
+    console.error('Error fetching challenge by slug:', err);
+    res.status(500).json({ error: 'Failed to fetch challenge' });
   }
 });
 

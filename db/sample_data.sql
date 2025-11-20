@@ -41,10 +41,31 @@ VALUES
 -- ================================
 -- Challenges
 -- ================================
-INSERT INTO challenges (name, description, starts_at, ends_at)
+INSERT INTO challenges (
+  name, 
+  slug,
+  short_description, 
+  long_description,
+  starts_at, 
+  ends_at
+)
 VALUES
-  ('No Variant 2025', 'No Variant Challenge 2025', '2025-01-01T00:00:00Z', '2025-12-31T23:59:59Z'),
-  ('No Variant 2026', 'No Variant Challenge 2026', '2026-01-01T00:00:00Z', '2026-12-31T23:59:59Z');
+  (
+    'No Variant 2025', 
+    'no-var-2025',
+    'No Variant Challenge 2025', 
+    $$Over the next wee while, we're going to play 100 games of No Var and aim to get the highest % of max score we can.\n\nTiers:\nover 70% max scores: 🥉\nBronze\nover 80% max scores: 🥈\nSilver\nover 90% max scores: 🥇\nGold\nover 95% max scores: 💎\nDiamond$$,
+    '2025-01-01T00:00:00Z', 
+    '2025-12-31T23:59:59Z'
+  ),
+  (
+    'No Variant 2026', 
+    'no-var-2026',
+    'No Variant Challenge 2026', 
+    $$Over the next wee while, we're going to play 100 games of No Var and aim to get the highest % of max score we can.\n\nTiers:\nover 70% max scores: 🥉\nBronze\nover 80% max scores: 🥈\nSilver\nover 90% max scores: 🥇\nGold\nover 95% max scores: 💎\nDiamond$$,
+    '2026-01-01T00:00:00Z', 
+    '2026-12-31T23:59:59Z'
+  );
 
 -- challenge_ids:
 -- 1 = No Variant 2025

@@ -31,8 +31,10 @@ CREATE TABLE users (
 
 CREATE TABLE challenges (
   id SERIAL PRIMARY KEY,
+  slug TEXT NOT NULL UNIQUE,
   name TEXT NOT NULL UNIQUE,
-  description TEXT,
+  short_description TEXT,
+  long_description TEXT NOT NULL,
   starts_at TIMESTAMPTZ,
   ends_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW()

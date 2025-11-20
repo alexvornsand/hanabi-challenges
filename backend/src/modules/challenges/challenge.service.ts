@@ -11,11 +11,12 @@ export class ChallengeSeedExistsError extends Error {
 
 export interface Challenge {
   id: number;
+  slug: string;
   name: string;
-  description: string | null;
+  short_description: string | null;
+  long_description: string;
   starts_at: string | null;
   ends_at: string | null;
-  created_at: string;
 }
 
 export interface ChallengeSeed {
@@ -34,19 +35,40 @@ export interface ChallengeTeam {
   created_at: string;
 }
 
+export interface ChallengeDetail {
+  id: number;
+  slug: string;
+  name: string;
+  short_description: string | null;
+  long_description: string;
+  starts_at: string | null;
+  ends_at: string | null;
+}
+
+export interface CreateChallengeInput {
+  name: string;
+  slug: string;
+  short_description?: string | null;
+  long_description: string;
+  starts_at?: string | null;
+  ends_at?: string | null;
+}
+
+
 // List all challenges
 export async function listChallenges(): Promise<Challenge[]> {
-  const result = await pool.query(
+  const result = await pool.query<Challenge>(
     `
     SELECT
       id,
+      slug,
       name,
-      description,
+      short_description,
+      long_description,
       starts_at,
-      ends_at,
-      created_at
+      ends_at
     FROM challenges
-    ORDER BY id;
+    ORDER BY starts_at NULLS LAST, id
     `,
   );
 
@@ -54,28 +76,32 @@ export async function listChallenges(): Promise<Challenge[]> {
 }
 
 // Create a new challenge
-export async function createChallenge(input: {
-  name: string;
-  description?: string | null;
-  starts_at?: string | null;
-  ends_at?: string | null;
-}): Promise<Challenge> {
-  const { name, description = null, starts_at = null, ends_at = null } = input;
+export async function createChallenge(input: CreateChallengeInput) {
+  const { name, slug, short_description, long_description, starts_at, ends_at } = input;
+
+  if (!slug) {
+    throw { code: 'CHALLENGE_SLUG_REQUIRED' } as { code: string };
+  }
+
+  if (!long_description) {
+    throw { code: 'CHALLENGE_LONG_DESCRIPTION_REQUIRED' } as { code: string };
+  }
 
   try {
     const result = await pool.query(
       `
-      INSERT INTO challenges (name, description, starts_at, ends_at)
-      VALUES ($1, $2, $3, $4)
-      RETURNING id, name, description, starts_at, ends_at, created_at;
+      INSERT INTO challenges (name, slug, short_description, long_description, starts_at, ends_at)
+      VALUES ($1, $2, $3, $4, $5, $6)
+      RETURNING id, name, slug, short_description, long_description, starts_at, ends_at, created_at;
       `,
-      [name, description, starts_at, ends_at],
+      [name, slug, short_description ?? null, long_description, starts_at, ends_at],
     );
 
     return result.rows[0];
-  } catch (err) {
-    if ((err as { code?: string }).code === '23505') {
-      throw new ChallengeNameExistsError('Challenge name must be unique');
+  } catch (err: any) {
+    if (err.code === '23505') {
+      // unique violation on name or slug
+      throw { code: 'CHALLENGE_NAME_EXISTS' } as { code: string };
     }
     throw err;
   }
@@ -149,4 +175,29 @@ export async function listChallengeTeams(challengeId: number): Promise<Challenge
   );
 
   return result.rows;
+}
+
+// Get a single challenge by its slug (e.g. "no-var-2025")
+export async function getChallengeBySlug(slug: string): Promise<ChallengeDetail | null> {
+  const result = await pool.query<ChallengeDetail>(
+    `
+      SELECT
+        id,
+        slug,
+        name,
+        short_description,
+        long_description,
+        starts_at,
+        ends_at
+      FROM challenges
+      WHERE slug = $1
+    `,
+    [slug],
+  );
+
+  if (result.rowCount === 0) {
+    return null;
+  }
+
+  return result.rows[0];
 }
