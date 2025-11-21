@@ -5,7 +5,7 @@ export type ZeroReason = 'Strike Out' | 'Time Out' | 'VTK' | null;
 
 export interface GameResultRow {
   id: number;
-  team_enrollment_id: number;
+  team_id: number;
   seed_id: number;
   game_id: number | null; // hanab.live id
   score: number;
@@ -27,11 +27,11 @@ export interface GameResultDetail extends GameResultRow {
 
 /**
  * Create a game result: insert into games with result fields.
- * Assumes team_enrollment_id and seed_id are valid and
- * uniqueness (team_enrollment_id, seed_id) is enforced by the DB.
+ * Assumes team_id and seed_id are valid and
+ * uniqueness (team_id, seed_id) is enforced by the DB.
  */
 export async function createGameResult(input: {
-  team_enrollment_id: number;
+  team_id: number;
   seed_id: number;
   game_id?: number | null; // hanab.live
   score: number;
@@ -41,7 +41,7 @@ export async function createGameResult(input: {
   played_at?: string | null;
 }): Promise<GameResultRow> {
   const {
-    team_enrollment_id,
+    team_id,
     seed_id,
     game_id = null,
     score,
@@ -55,7 +55,7 @@ export async function createGameResult(input: {
     const result = await pool.query(
       `
       INSERT INTO games (
-        team_enrollment_id,
+        team_id,
         seed_id,
         game_id,
         score,
@@ -67,7 +67,7 @@ export async function createGameResult(input: {
       VALUES ($1, $2, $3, $4, $5, $6, $7, COALESCE($8, NOW()))
       RETURNING
         id,
-        team_enrollment_id,
+        team_id,
         seed_id,
         game_id,
         score,
@@ -78,7 +78,7 @@ export async function createGameResult(input: {
         created_at;
       `,
       [
-        team_enrollment_id,
+        team_id,
         seed_id,
         game_id,
         score,
@@ -110,7 +110,7 @@ export async function getGameResultById(id: number): Promise<GameResultDetail | 
     `
     SELECT
       g.id,
-      g.team_enrollment_id,
+      g.team_id,
       g.seed_id,
       g.game_id,
       g.score,
@@ -121,20 +121,18 @@ export async function getGameResultById(id: number): Promise<GameResultDetail | 
       g.created_at,
       cs.challenge_id,
       cs.seed_number,
-      t.id AS team_id,
       t.name AS team_name,
-      te.player_count,
-      array_agg(u.display_name ORDER BY u.display_name) AS players
+      t.team_size AS player_count,
+      array_remove(array_agg(u.display_name ORDER BY u.display_name), NULL) AS players
     FROM games g
     JOIN challenge_seeds cs ON cs.id = g.seed_id
-    JOIN team_enrollments te ON te.id = g.team_enrollment_id
-    JOIN teams t ON t.id = te.team_id
-    JOIN game_participants gp ON gp.game_id = g.id
-    JOIN users u ON u.id = gp.user_id
+    JOIN teams t ON t.id = g.team_id
+    LEFT JOIN game_participants gp ON gp.game_id = g.id
+    LEFT JOIN users u ON u.id = gp.user_id
     WHERE g.id = $1
     GROUP BY
       g.id,
-      g.team_enrollment_id,
+      g.team_id,
       g.seed_id,
       g.game_id,
       g.score,
@@ -145,9 +143,8 @@ export async function getGameResultById(id: number): Promise<GameResultDetail | 
       g.created_at,
       cs.challenge_id,
       cs.seed_number,
-      t.id,
       t.name,
-      te.player_count;
+      t.team_size;
     `,
     [id],
   );

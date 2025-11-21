@@ -4,13 +4,25 @@ import { authRequired, requireAdmin } from '../../middleware/authMiddleware';
 import {
   listChallenges,
   createChallenge,
-  listChallengeSeedsBySlug,
-  createChallengeSeedBySlug,
-  listChallengeTeamsBySlug,
+  listChallengeSeeds,
+  createChallengeSeed,
+  listChallengeTeams,
   getChallengeBySlug,
 } from './challenge.service';
+import { pool } from '../../config/db';
 
 const router = Router();
+
+/* ------------------------------------------
+ *  Helper: look up numeric challenge_id from slug
+ * ----------------------------------------*/
+async function getChallengeId(slug: string): Promise<number | null> {
+  const result = await pool.query<{ id: number }>(
+    `SELECT id FROM challenges WHERE slug = $1`,
+    [slug]
+  );
+  return result.rowCount > 0 ? result.rows[0].id : null;
+}
 
 /* ------------------------------------------
  *  GET /api/challenges
@@ -47,9 +59,11 @@ router.post('/', authRequired, requireAdmin, async (req: Request, res: Response)
 
     res.status(201).json(challenge);
   } catch (err) {
-    if (err.code === 'CHALLENGE_NAME_EXISTS') {
+    const e = err as { code?: string };
+    if (e.code === 'CHALLENGE_NAME_EXISTS') {
       return res.status(409).json({ error: 'Challenge name must be unique' });
     }
+
     console.error('Error creating challenge:', err);
     res.status(500).json({ error: 'Failed to create challenge' });
   }
@@ -61,17 +75,11 @@ router.post('/', authRequired, requireAdmin, async (req: Request, res: Response)
 router.get('/:slug', async (req: Request, res: Response) => {
   const { slug } = req.params;
 
-  if (!slug) {
-    res.status(400).json({ error: 'slug is required' });
-    return;
-  }
-
   try {
     const challenge = await getChallengeBySlug(slug);
 
     if (!challenge) {
-      res.status(404).json({ error: 'Challenge not found' });
-      return;
+      return res.status(404).json({ error: 'Challenge not found' });
     }
 
     res.json(challenge);
@@ -88,7 +96,10 @@ router.get('/:slug/seeds', async (req: Request, res: Response) => {
   const { slug } = req.params;
 
   try {
-    const seeds = await listChallengeSeedsBySlug(slug);
+    const challengeId = await getChallengeId(slug);
+    if (!challengeId) return res.status(404).json({ error: 'Challenge not found' });
+
+    const seeds = await listChallengeSeeds(challengeId);
     res.json(seeds);
   } catch (err) {
     console.error('Error fetching seeds:', err);
@@ -108,7 +119,10 @@ router.post('/:slug/seeds', authRequired, requireAdmin, async (req: Request, res
   }
 
   try {
-    const seed = await createChallengeSeedBySlug(slug, {
+    const challengeId = await getChallengeId(slug);
+    if (!challengeId) return res.status(404).json({ error: 'Challenge not found' });
+
+    const seed = await createChallengeSeed(challengeId, {
       seed_number,
       variant: variant ?? null,
       seed_payload: seed_payload ?? null,
@@ -116,11 +130,13 @@ router.post('/:slug/seeds', authRequired, requireAdmin, async (req: Request, res
 
     res.status(201).json(seed);
   } catch (err) {
-    if (err.code === 'CHALLENGE_SEED_EXISTS') {
+    const e = err as { code?: string };
+    if (e.code === 'CHALLENGE_SEED_EXISTS') {
       return res.status(409).json({
         error: 'Seed already exists for this challenge with that number',
       });
     }
+
     console.error('Error creating seed:', err);
     res.status(500).json({ error: 'Failed to create seed' });
   }
@@ -133,7 +149,10 @@ router.get('/:slug/teams', async (req: Request, res: Response) => {
   const { slug } = req.params;
 
   try {
-    const teams = await listChallengeTeamsBySlug(slug);
+    const challengeId = await getChallengeId(slug);
+    if (!challengeId) return res.status(404).json({ error: 'Challenge not found' });
+
+    const teams = await listChallengeTeams(challengeId);
     res.json(teams);
   } catch (err) {
     console.error('Error fetching teams:', err);

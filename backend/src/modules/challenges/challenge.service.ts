@@ -31,8 +31,8 @@ export interface ChallengeSeed {
 export interface ChallengeTeam {
   id: number;
   name: string;
-  created_by_user_id: number;
   created_at: string;
+  team_size: number;
 }
 
 export interface ChallengeDetail {
@@ -101,21 +101,13 @@ export async function createChallenge(input: CreateChallengeInput) {
 
     return result.rows[0];
   } catch (err) {
-    if (err.code === '23505') {
+    const pgErr = err as { code?: string };
+
+    if (pgErr.code === '23505') {
       throw new ChallengeNameExistsError('Challenge name or slug must be unique');
     }
     throw err;
   }
-}
-
-/* ------------------------------------------
- * Internal: Find challenge ID by slug
- * ----------------------------------------*/
-async function getChallengeIdBySlug(slug: string): Promise<number | null> {
-  const result = await pool.query<{ id: number }>(`SELECT id FROM challenges WHERE slug = $1`, [
-    slug,
-  ]);
-  return result.rowCount > 0 ? result.rows[0].id : null;
 }
 
 /* ------------------------------------------
@@ -146,10 +138,10 @@ export async function getChallengeBySlug(slug: string): Promise<ChallengeDetail 
 }
 
 /* ------------------------------------------
- * Old: list seeds by numeric ID (still used internally)
+ * List seeds for a challenge (by challenge ID)
  * ----------------------------------------*/
 export async function listChallengeSeeds(challengeId: number): Promise<ChallengeSeed[]> {
-  const result = await pool.query(
+  const result = await pool.query<ChallengeSeed>(
     `
     SELECT
       cs.id,
@@ -169,16 +161,7 @@ export async function listChallengeSeeds(challengeId: number): Promise<Challenge
 }
 
 /* ------------------------------------------
- * New: list seeds by SLUG
- * ----------------------------------------*/
-export async function listChallengeSeedsBySlug(slug: string): Promise<ChallengeSeed[]> {
-  const challengeId = await getChallengeIdBySlug(slug);
-  if (!challengeId) return [];
-  return listChallengeSeeds(challengeId);
-}
-
-/* ------------------------------------------
- * Old: create seed using challenge ID
+ * Create a seed for a challenge (by challenge ID)
  * ----------------------------------------*/
 export async function createChallengeSeed(
   challengeId: number,
@@ -191,7 +174,7 @@ export async function createChallengeSeed(
   const { seed_number, variant = null, seed_payload = null } = input;
 
   try {
-    const result = await pool.query(
+    const result = await pool.query<ChallengeSeed>(
       `
       INSERT INTO challenge_seeds (challenge_id, seed_number, variant, seed_payload)
       VALUES ($1, $2, $3, $4)
@@ -202,7 +185,9 @@ export async function createChallengeSeed(
 
     return result.rows[0];
   } catch (err) {
-    if (err.code === '23505') {
+    const pgErr = err as { code?: string };
+
+    if (pgErr.code === '23505') {
       throw new ChallengeSeedExistsError('Seed already exists for this challenge with that number');
     }
     throw err;
@@ -210,35 +195,16 @@ export async function createChallengeSeed(
 }
 
 /* ------------------------------------------
- * New: create seed by SLUG
- * ----------------------------------------*/
-export async function createChallengeSeedBySlug(
-  slug: string,
-  input: {
-    seed_number: number;
-    variant?: string | null;
-    seed_payload?: string | null;
-  },
-): Promise<ChallengeSeed> {
-  const challengeId = await getChallengeIdBySlug(slug);
-  if (!challengeId) {
-    throw new Error(`Unknown challenge slug: ${slug}`);
-  }
-
-  return createChallengeSeed(challengeId, input);
-}
-
-/* ------------------------------------------
- * Old: list teams by numeric ID
+ * List teams for a challenge (by challenge ID)
  * ----------------------------------------*/
 export async function listChallengeTeams(challengeId: number): Promise<ChallengeTeam[]> {
-  const result = await pool.query(
+  const result = await pool.query<ChallengeTeam>(
     `
     SELECT
       t.id,
       t.name,
-      t.created_by_user_id,
-      t.created_at
+      t.created_at,
+      t.team_size
     FROM teams t
     WHERE t.challenge_id = $1
     ORDER BY t.id;
@@ -247,13 +213,4 @@ export async function listChallengeTeams(challengeId: number): Promise<Challenge
   );
 
   return result.rows;
-}
-
-/* ------------------------------------------
- * New: list teams by SLUG
- * ----------------------------------------*/
-export async function listChallengeTeamsBySlug(slug: string): Promise<ChallengeTeam[]> {
-  const challengeId = await getChallengeIdBySlug(slug);
-  if (!challengeId) return [];
-  return listChallengeTeams(challengeId);
 }

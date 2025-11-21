@@ -2,7 +2,7 @@
 import { Router, Request, Response } from 'express';
 import {
   listTeamMembers,
-  createTeamWithCreator,
+  createTeam,
   addTeamMember,
   listMemberCandidates,
   TeamRole,
@@ -29,31 +29,37 @@ router.get('/:id/members', async (req: Request, res: Response) => {
   }
 });
 
-// POST /api/teams (auth required, creator becomes MANAGER)
+// POST /api/teams (auth required)
 router.post('/', authRequired, async (req: AuthenticatedRequest, res: Response) => {
-  const { challenge_id, name } = req.body;
+  const { challenge_id, name, team_size } = req.body;
 
-  if (!challenge_id || !name) {
+  if (!challenge_id || !name || team_size == null) {
     res.status(400).json({
-      error: 'challenge_id and name are required',
+      error: 'challenge_id, name, and team_size are required',
     });
     return;
   }
 
-  const created_by_user_id = req.user!.userId;
+  const parsedTeamSize = Number(team_size);
+  if (!Number.isInteger(parsedTeamSize) || parsedTeamSize < 2 || parsedTeamSize > 6) {
+    res.status(400).json({
+      error: 'team_size must be an integer between 2 and 6',
+    });
+    return;
+  }
 
   try {
-    const team = await createTeamWithCreator({
+    const team = await createTeam({
       challenge_id,
       name,
-      created_by_user_id,
+      team_size: parsedTeamSize,
     });
 
     res.status(201).json(team);
   } catch (err) {
     if (err.code === 'TEAM_CREATE_CONFLICT') {
       res.status(409).json({
-        error: 'Team name must be unique within the challenge, or creator is already a member',
+        error: 'Team name must be unique within the challenge',
       });
       return;
     }
@@ -75,14 +81,14 @@ router.post('/:id/members', authRequired, async (req: Request, res: Response) =>
 
   if (!user_id || !role) {
     res.status(400).json({
-      error: 'user_id and role are required (PLAYER or MANAGER)',
+      error: 'user_id and role are required (PLAYER or STAFF)',
     });
     return;
   }
 
-  if (role !== 'PLAYER' && role !== 'MANAGER') {
+  if (role !== 'PLAYER' && role !== 'STAFF') {
     res.status(400).json({
-      error: "role must be either 'PLAYER' or 'MANAGER'",
+      error: "role must be either 'PLAYER' or 'STAFF'",
     });
     return;
   }

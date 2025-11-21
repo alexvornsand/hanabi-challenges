@@ -19,6 +19,7 @@ export function AppRoutes() {
           <Route path="challenges">
             <Route index element={<ChallengeArchivePage />} />
             <Route path=":slug" element={<ChallengeDetailPage />} />
+            <Route path=":slug/:teamSize" element={<ChallengeDetailPage />} />
           </Route>
 
           {/* Catch-all */}

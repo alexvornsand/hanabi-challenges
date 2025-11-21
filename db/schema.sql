@@ -4,7 +4,6 @@ CREATE EXTENSION IF NOT EXISTS citext;
 -- Drop tables in dependency order (children first)
 DROP TABLE IF EXISTS game_participants CASCADE;
 DROP TABLE IF EXISTS games CASCADE;
-DROP TABLE IF EXISTS team_enrollments CASCADE;
 DROP TABLE IF EXISTS challenge_seeds CASCADE;
 DROP TABLE IF EXISTS team_memberships CASCADE;
 DROP TABLE IF EXISTS teams CASCADE;
@@ -48,9 +47,9 @@ CREATE TABLE teams (
   id SERIAL PRIMARY KEY,
   challenge_id INTEGER NOT NULL REFERENCES challenges(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
-  created_by_user_id INTEGER REFERENCES users(id),
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE (challenge_id, name)       -- no duplicate team names within a challenge
+  team_size INTEGER NOT NULL CHECK (team_size IN (2, 3, 4, 5, 6)),
+  UNIQUE (challenge_id, name)
 );
 
 ------------------------------------------------------------
@@ -61,7 +60,7 @@ CREATE TABLE team_memberships (
   id SERIAL PRIMARY KEY,
   team_id INTEGER NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  role TEXT NOT NULL CHECK (role IN ('PLAYER', 'MANAGER')),
+  role TEXT NOT NULL CHECK (role IN ('PLAYER', 'STAFF')),
   is_listed BOOLEAN NOT NULL DEFAULT TRUE,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE (team_id, user_id, role)
@@ -84,26 +83,13 @@ CREATE TABLE challenge_seeds (
 );
 
 ------------------------------------------------------------
--- TEAM ENROLLMENTS
--- A team enters a specific player-count track (2p, 3p, etc.) for a challenge
-------------------------------------------------------------
-
-CREATE TABLE team_enrollments (
-  id SERIAL PRIMARY KEY,
-  team_id INTEGER NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
-  player_count INTEGER NOT NULL CHECK (player_count BETWEEN 2 AND 6),
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE (team_id, player_count)
-);
-
-------------------------------------------------------------
 -- GAMES
--- A single logged play of (team_enrollment, seed)
+-- A single logged play of (team, seed)
 ------------------------------------------------------------
 
 CREATE TABLE games (
   id SERIAL PRIMARY KEY,
-  team_enrollment_id INTEGER NOT NULL REFERENCES team_enrollments(id) ON DELETE CASCADE,
+  team_id INTEGER NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
   seed_id INTEGER NOT NULL REFERENCES challenge_seeds(id) ON DELETE CASCADE,
   game_id INTEGER,
   score INTEGER NOT NULL,
@@ -113,7 +99,7 @@ CREATE TABLE games (
   notes TEXT,
   played_at TIMESTAMPTZ DEFAULT NOW(),
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE (team_enrollment_id, seed_id)
+  UNIQUE (team_id, seed_id)
 );
 
 ------------------------------------------------------------

@@ -20,7 +20,6 @@ describe('team.service (integration)', () => {
         game_participants,
         games,
         challenge_seeds,
-        team_enrollments,
         team_memberships,
         teams,
         challenges,
@@ -71,8 +70,8 @@ describe('team.service (integration)', () => {
 
     const teamRes = await pool.query(
       `
-      INSERT INTO teams (name, challenge_id)
-      VALUES ($1, $2)
+      INSERT INTO teams (name, challenge_id, team_size)
+      VALUES ($1, $2, 3)
       RETURNING id, name, challenge_id;
       `,
       [teamName, challengeId],
@@ -97,10 +96,10 @@ describe('team.service (integration)', () => {
       `
       INSERT INTO team_memberships (team_id, user_id, role, is_listed)
       VALUES 
-        ($1, $2, 'MANAGER', true),
-        ($1, $3, 'PLAYER',  true),
-        ($1, $4, 'PLAYER',  true),
-        ($1, $5, 'PLAYER',  true);
+        ($1, $2, 'STAFF',  true),
+        ($1, $3, 'PLAYER', true),
+        ($1, $4, 'PLAYER', true),
+        ($1, $5, 'PLAYER', true);
       `,
       [teamId, aliceId, bobId, carolId, daveId],
     );
@@ -113,7 +112,7 @@ describe('team.service (integration)', () => {
     expect(names).toEqual(['alice', 'bob', 'carol', 'dave'].sort());
   });
 
-  it('createTeamWithCreator creates a team and MANAGER membership', async () => {
+  it('createTeamWithCreator creates a team and STAFF membership', async () => {
     const userIds = await seedUsers();
 
     const challengeRes = await pool.query(
@@ -137,13 +136,14 @@ describe('team.service (integration)', () => {
     const team = await createTeamWithCreator({
       challenge_id: challengeId,
       name: TEST_TEAM_NAME,
-      created_by_user_id: bobId,
+      team_size: 3,
+      creator_user_id: bobId,
     });
 
     expect(team.id).toBeGreaterThan(0);
     expect(team.name).toBe(TEST_TEAM_NAME);
     expect(team.challenge_id).toBe(challengeId);
-    expect(team.created_by_user_id).toBe(bobId);
+    expect(team.team_size).toBe(3);
 
     const membershipRes = await pool.query(
       `
@@ -155,7 +155,7 @@ describe('team.service (integration)', () => {
     );
 
     expect(membershipRes.rowCount).toBe(1);
-    expect(membershipRes.rows[0].role).toBe('MANAGER');
+    expect(membershipRes.rows[0].role).toBe('STAFF');
   });
 
   it('addTeamMember adds a member and rejects duplicate roles', async () => {
@@ -182,7 +182,8 @@ describe('team.service (integration)', () => {
     const team = await createTeamWithCreator({
       challenge_id: challengeId,
       name: 'Member Test Team',
-      created_by_user_id: bobId,
+      team_size: 3,
+      creator_user_id: bobId,
     });
 
     const member = await addTeamMember({
@@ -224,10 +225,10 @@ describe('team.service (integration)', () => {
       `
       INSERT INTO team_memberships (team_id, user_id, role, is_listed)
       VALUES
-        ($1, $2, 'MANAGER', true),
-        ($1, $3, 'PLAYER',  true),
-        ($1, $4, 'PLAYER',  true),
-        ($1, $5, 'PLAYER',  true);
+        ($1, $2, 'STAFF',  true),
+        ($1, $3, 'PLAYER', true),
+        ($1, $4, 'PLAYER', true),
+        ($1, $5, 'PLAYER', true);
       `,
       [teamId, aliceId, bobId, carolId, daveId],
     );

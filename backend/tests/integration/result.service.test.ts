@@ -18,7 +18,6 @@ describe('result.service (games, integration)', () => {
         game_participants,
         games,
         challenge_seeds,
-        team_enrollments,
         team_memberships,
         teams,
         challenges,
@@ -57,17 +56,18 @@ describe('result.service (games, integration)', () => {
     const seedId = seedRes.rows[0].id as number;
     const seedNumber = seedRes.rows[0].seed_number as number;
 
-    // Team
+    // Team (3-player team for this test)
     const teamRes = await pool.query(
       `
-      INSERT INTO teams (name, challenge_id)
-      VALUES ($1, $2)
-      RETURNING id, name;
+      INSERT INTO teams (name, challenge_id, team_size)
+      VALUES ($1, $2, 3)
+      RETURNING id, name, team_size;
       `,
       ['Lanterns', challengeId],
     );
     const teamId = teamRes.rows[0].id as number;
     const teamName = teamRes.rows[0].name as string;
+    const teamSize = teamRes.rows[0].team_size as number;
 
     // Users / players
     const playersRes = await pool.query(
@@ -83,27 +83,19 @@ describe('result.service (games, integration)', () => {
     const playerIds = playersRes.rows.map((r) => r.id as number);
     const playerNames = playersRes.rows.map((r) => r.display_name as string);
 
-    // Team enrollment — no challenge_id column here
-    const enrollmentRes = await pool.query(
-      `
-      INSERT INTO team_enrollments (team_id, player_count)
-      VALUES ($1, $2)
-      RETURNING id, player_count;
-      `,
-      [teamId, playerIds.length],
-    );
-    const teamEnrollmentId = enrollmentRes.rows[0].id as number;
-    const playerCount = enrollmentRes.rows[0].player_count as number;
+    // In the new schema, player_count comes from teams.team_size.
+    const playerCount = teamSize;
 
     return {
       challengeId,
       seedId,
       seedNumber,
-      teamEnrollmentId,
+      teamId,
       teamName,
       playerIds,
       playerNames,
       playerCount,
+      teamSize,
     };
   }
 
@@ -112,7 +104,7 @@ describe('result.service (games, integration)', () => {
       challengeId,
       seedId,
       seedNumber,
-      teamEnrollmentId,
+      teamId,
       teamName,
       playerIds,
       playerNames,
@@ -121,7 +113,7 @@ describe('result.service (games, integration)', () => {
 
     // Create a game using the service under test
     const created = await createGameResult({
-      team_enrollment_id: teamEnrollmentId,
+      team_id: teamId,
       seed_id: seedId,
       game_id: 1234,
       score: 25,
@@ -160,11 +152,11 @@ describe('result.service (games, integration)', () => {
     expect(playersSorted).toEqual(playerNames.slice().sort());
   });
 
-  it('createGameResult inserts a new game record for a fresh (team_enrollment, seed) pair', async () => {
-    const { seedId, teamEnrollmentId } = await setupChallengeSeedTeamAndUsers();
+  it('createGameResult inserts a new game record for a fresh (team, seed) pair', async () => {
+    const { seedId, teamId } = await setupChallengeSeedTeamAndUsers();
 
     const row = await createGameResult({
-      team_enrollment_id: teamEnrollmentId,
+      team_id: teamId,
       seed_id: seedId,
       game_id: 9999,
       score: 19,
@@ -175,7 +167,7 @@ describe('result.service (games, integration)', () => {
     });
 
     expect(row.id).toBeGreaterThan(0);
-    expect(row.team_enrollment_id).toBe(teamEnrollmentId);
+    expect(row.team_id).toBe(teamId);
     expect(row.seed_id).toBe(seedId);
     expect(row.score).toBe(19);
     expect(row.zero_reason).toBe('Time Out');
@@ -196,11 +188,11 @@ describe('result.service (games, integration)', () => {
     expect(dbCheck.rows[0].notes).toBe('Unit test game result');
   });
 
-  it('createGameResult rejects duplicate (team_enrollment, seed) with GAME_RESULT_EXISTS', async () => {
-    const { seedId, teamEnrollmentId } = await setupChallengeSeedTeamAndUsers();
+  it('createGameResult rejects duplicate (team, seed) with GAME_RESULT_EXISTS', async () => {
+    const { seedId, teamId } = await setupChallengeSeedTeamAndUsers();
 
     const first = await createGameResult({
-      team_enrollment_id: teamEnrollmentId,
+      team_id: teamId,
       seed_id: seedId,
       game_id: 10001,
       score: 10,
@@ -214,7 +206,7 @@ describe('result.service (games, integration)', () => {
 
     await expect(
       createGameResult({
-        team_enrollment_id: teamEnrollmentId,
+        team_id: teamId,
         seed_id: seedId,
         game_id: 10002,
         score: 5,

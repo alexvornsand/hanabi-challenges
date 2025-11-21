@@ -24,7 +24,6 @@ describe('challenge.service (integration)', () => {
         games,
         game_participants,
         challenge_seeds,
-        team_enrollments,
         team_memberships,
         teams,
         challenges,
@@ -114,8 +113,8 @@ describe('challenge.service (integration)', () => {
 
     await pool.query(
       `
-      INSERT INTO teams (name, challenge_id)
-      VALUES ($1, $2), ($3, $2)
+      INSERT INTO teams (name, challenge_id, team_size)
+      VALUES ($1, $2, 3), ($3, $2, 3)
       RETURNING id, name;
       `,
       ['Lanterns', challengeId, 'Clue Crew'],

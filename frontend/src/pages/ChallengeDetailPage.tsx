@@ -3,9 +3,15 @@ import { NotFoundPage } from './NotFoundPage';
 import { useChallengeDetail } from '../hooks/useChallengeDetail';
 
 export function ChallengeDetailPage() {
-  const { slug } = useParams<{ slug: string }>();
-  const { challenge, loading, error, notFound } = useChallengeDetail(slug);
+  const { slug, teamSize } = useParams<{ slug: string; teamSize?: string }>();
 
+  const parsedTeamSize = (() => {
+    const n = teamSize ? Number(teamSize) : 3;
+    if (!Number.isInteger(n) || n < 2 || n > 6) return 3;
+    return n;
+  })();
+
+  const { challenge, loading, error, notFound } = useChallengeDetail(slug);
   if (notFound) {
     return <NotFoundPage />;
   }

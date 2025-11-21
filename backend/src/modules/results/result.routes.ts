@@ -11,7 +11,7 @@ const router = Router();
  *
  * Body:
  * {
- *   "team_enrollment_id": number,
+ *   "team_id": number,
  *   "seed_id": number,
  *   "game_id": number | null,          // hanab.live id
  *   "score": number,
@@ -23,7 +23,7 @@ const router = Router();
  */
 router.post('/', authRequired, async (req: Request, res: Response) => {
   const {
-    team_enrollment_id,
+    team_id,
     seed_id,
     game_id,
     score,
@@ -35,7 +35,7 @@ router.post('/', authRequired, async (req: Request, res: Response) => {
 
   if (team_enrollment_id == null || seed_id == null || score == null) {
     res.status(400).json({
-      error: 'team_enrollment_id, seed_id, and score are required',
+      error: 'team_id, seed_id, and score are required',
     });
     return;
   }
@@ -54,7 +54,7 @@ router.post('/', authRequired, async (req: Request, res: Response) => {
 
   try {
     const row = await createGameResult({
-      team_enrollment_id,
+      team_id,
       seed_id,
       game_id: game_id ?? null,
       score,

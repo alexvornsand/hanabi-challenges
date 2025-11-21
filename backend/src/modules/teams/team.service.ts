@@ -1,13 +1,13 @@
 // src/modules/teams/team.service.ts
 import { pool } from '../../config/db';
 
-export type TeamRole = 'PLAYER' | 'MANAGER';
+export type TeamRole = 'PLAYER' | 'STAFF';
 
 export interface Team {
   id: number;
   challenge_id: number;
   name: string;
-  created_by_user_id: number;
+  team_size: number;
   created_at: string;
 }
 
@@ -49,47 +49,24 @@ export async function listTeamMembers(teamId: number): Promise<TeamMember[]> {
   return result.rows;
 }
 
-// Create a new team and add creator as MANAGER
-export async function createTeamWithCreator(input: {
-  challenge_id: number;
-  name: string;
-  created_by_user_id: number;
-}): Promise<Team> {
-  const { challenge_id, name, created_by_user_id } = input;
+// Create a new team
+export async function createTeam(input: { challenge_id: number; name: string; team_size: number }) {
+  const { challenge_id, name, team_size } = input;
 
   try {
-    await pool.query('BEGIN');
-
     const teamResult = await pool.query(
       `
-      INSERT INTO teams (challenge_id, name, created_by_user_id)
+      INSERT INTO teams (challenge_id, name, team_size)
       VALUES ($1, $2, $3)
-      RETURNING id, challenge_id, name, created_by_user_id, created_at;
+      RETURNING id, challenge_id, name, team_size, created_at;
       `,
-      [challenge_id, name, created_by_user_id],
+      [challenge_id, name, team_size],
     );
 
-    const team: Team = teamResult.rows[0];
-
-    await pool.query(
-      `
-      INSERT INTO team_memberships (team_id, user_id, role, is_listed)
-      VALUES ($1, $2, $3, $4);
-      `,
-      [team.id, created_by_user_id, 'MANAGER', true],
-    );
-
-    await pool.query('COMMIT');
-
-    return team;
+    return teamResult.rows[0];
   } catch (err) {
-    await pool.query('ROLLBACK');
-
-    if (err.code === '23505') {
-      // could be team name unique or membership unique
-      const e = new Error(
-        'Team name must be unique within the challenge, or creator is already a member',
-      );
+    if ((err as { code?: string }).code === '23505') {
+      const e = new Error('Team name must be unique within the challenge');
       (e as { code?: string }).code = 'TEAM_CREATE_CONFLICT';
       throw e;
     }
@@ -98,7 +75,57 @@ export async function createTeamWithCreator(input: {
   }
 }
 
-// Add a member (PLAYER or MANAGER) to a team
+// Create a team and add the creator as STAFF
+export async function createTeamWithCreator(input: {
+  challenge_id: number;
+  name: string;
+  team_size: number;
+  creator_user_id: number;
+}) {
+  const { challenge_id, name, team_size, creator_user_id } = input;
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    const teamResult = await client.query(
+      `
+      INSERT INTO teams (challenge_id, name, team_size)
+      VALUES ($1, $2, $3)
+      RETURNING id, challenge_id, name, team_size, created_at;
+      `,
+      [challenge_id, name, team_size],
+    );
+
+    const team = teamResult.rows[0];
+
+    await client.query(
+      `
+      INSERT INTO team_memberships (team_id, user_id, role, is_listed)
+      VALUES ($1, $2, 'STAFF', true)
+      ON CONFLICT DO NOTHING;
+      `,
+      [team.id, creator_user_id],
+    );
+
+    await client.query('COMMIT');
+    return team;
+  } catch (err) {
+    await client.query('ROLLBACK');
+
+    if ((err as { code?: string }).code === '23505') {
+      const e = new Error('Team name must be unique within the challenge');
+      (e as { code?: string }).code = 'TEAM_CREATE_CONFLICT';
+      throw e;
+    }
+
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+// Add a member (PLAYER or STAFF) to a team
 export async function addTeamMember(input: {
   team_id: number;
   user_id: number;
