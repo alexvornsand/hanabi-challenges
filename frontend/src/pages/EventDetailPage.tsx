@@ -1,8 +1,8 @@
 import { useParams } from 'react-router-dom';
 import { NotFoundPage } from './NotFoundPage';
-import { useChallengeDetail } from '../hooks/useChallengeDetail';
+import { useEventDetail } from '../hooks/useEventDetail';
 
-export function ChallengeDetailPage() {
+export function EventDetailPage() {
   const { slug, teamSize } = useParams<{ slug: string; teamSize?: string }>();
 
   const parsedTeamSize = (() => {
@@ -11,7 +11,7 @@ export function ChallengeDetailPage() {
     return n;
   })();
 
-  const { challenge, loading, error, notFound } = useChallengeDetail(slug);
+  const { event, loading, error, notFound } = useEventDetail(slug);
   if (notFound) {
     return <NotFoundPage />;
   }
@@ -19,42 +19,42 @@ export function ChallengeDetailPage() {
   if (loading) {
     return (
       <main className="p-4">
-        <p>Loading challenge...</p>
+        <p>Loading event...</p>
       </main>
     );
   }
 
-  if (error && !challenge) {
+  if (error && !event) {
     return (
       <main className="p-4">
-        <h1 className="text-xl font-semibold mb-2">Challenge</h1>
+        <h1 className="text-xl font-semibold mb-2">Event</h1>
         <p className="text-red-600">{error}</p>
       </main>
     );
   }
 
-  if (!challenge) {
+  if (!event) {
     return (
       <main className="p-4">
-        <h1 className="text-xl font-semibold mb-2">Challenge not found</h1>
+        <h1 className="text-xl font-semibold mb-2">Event not found</h1>
       </main>
     );
   }
 
-  const startsAt = challenge.starts_at ? new Date(challenge.starts_at) : null;
-  const endsAt = challenge.ends_at ? new Date(challenge.ends_at) : null;
+  const startsAt = event.starts_at ? new Date(event.starts_at) : null;
+  const endsAt = event.ends_at ? new Date(event.ends_at) : null;
 
   return (
     <main className="p-4 space-y-4">
       <header>
-        <h1 className="text-2xl font-bold">{challenge.name}</h1>
+        <h1 className="text-2xl font-bold">{event.name}</h1>
 
-        {challenge.short_description && (
-          <p className="text-gray-700 mt-1">{challenge.short_description}</p>
+        {event.short_description && (
+          <p className="text-gray-700 mt-1">{event.short_description}</p>
         )}
 
         <p className="text-sm text-gray-500 mt-1">
-          Slug: <code>{challenge.slug}</code>
+          Slug: <code>{event.slug}</code>
         </p>
 
         {(startsAt || endsAt) && (
@@ -70,9 +70,9 @@ export function ChallengeDetailPage() {
         )}
       </header>
 
-      {challenge.long_description && (
+      {event.long_description && (
         <section className="prose max-w-none">
-          {challenge.long_description.split('\n\n').map((block, idx) => (
+          {event.long_description.split('\n\n').map((block, idx) => (
             <p key={idx}>{block}</p>
           ))}
         </section>
@@ -80,7 +80,7 @@ export function ChallengeDetailPage() {
 
       <section className="mt-6 border-t pt-4">
         <p className="text-sm text-gray-500">
-          Seeds, teams, and results summary will appear here later.
+          Game templates, teams, and results summary will appear here later.
         </p>
       </section>
     </main>

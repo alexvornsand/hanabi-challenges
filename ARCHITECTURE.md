@@ -1,8 +1,9 @@
-# Hanabi Challenges – Architecture Overview
+# Hanabi Events – Architecture Overview
 
-This document describes the high-level architecture of the Hanabi Challenges
+This document describes the high-level architecture of the Hanabi Events
 application, covering the backend structure, database relationships, API layer,
-testing strategy, and upcoming frontend plans.
+testing strategy, and upcoming frontend plans. (The project was originally
+framed around “challenges” and now uses “events” as the primary concept.)
 
 ---
 
@@ -10,13 +11,14 @@ testing strategy, and upcoming frontend plans.
 
 The system provides:
 
-- A way to define Hanabi “challenges” (e.g., No Variant Cup 2025)
-- Seeds within each challenge (e.g., specific shuffled decks or scenarios)
-- Teams participating in a challenge
+- A way to define Hanabi “events” (e.g., No Variant Cup 2025)
+- Ordered stages within each event
+- Game templates within each stage (replacing “seeds”)
+- Teams participating in an event
 - Team members (players)
 - Game results (scores, zero-reason metadata, notes, etc.)
 - A set of API routes for managing all of the above
-- (Future) A React frontend for interacting with challenges and results
+- (Future) A React frontend for interacting with events and results
 
 It is built for clarity, correctness, and extensibility rather than raw throughput.
 
@@ -40,8 +42,8 @@ config/ — database connection
 middleware/ — auth, admin guards
 modules/
 auth/ — login / JWT creation / user mgmt
-challenges/ — challenge + seed logic
-teams/ — team + membership logic
+events/ — event + stage + template logic
+teams/ — event team + membership logic
 results/ — game result creation + hydration
 tests/
 unit/
@@ -55,34 +57,38 @@ unit/
 The system uses PostgreSQL. Core tables include:
 
 - `users`
-- `challenges`
-- `challenge_seeds`
-- `teams`
+- `events`
+- `event_stages`
+- `event_game_templates`
+- `event_teams`
 - `team_memberships`
-- `team_enrollments` (team + challenge participation)
-- `games`
+- `event_stage_team_statuses`
+- `event_games`
 - `game_participants`
 
 ### 3.1 Relationships (Simplified)
 
-- **Challenge** has many **Seeds**
-- **Team** belongs to a **Challenge**
-- **Team** has many **TeamMemberships** (users)
-- **TeamEnrollment** associates a team with a challenge instance
-- **GameResult (games)** belongs to a TeamEnrollment + Seed pair
+- **Event** has many **EventStages**
+- **EventStage** has many **EventGameTemplates**
+- **EventTeam** belongs to an **Event**
+- **EventTeam** has many **TeamMemberships** (users)
+- **EventStageTeamStatus** tracks an event team’s progress in a stage
+- **GameResult (event_games)** belongs to an EventTeam + EventGameTemplate pair
 - **GameParticipants** links users to a specific game result
 
 ### 3.2 Uniqueness Constraints
 
 Important uniqueness constraints enforced at DB level:
 
-- `challenges.name` is unique
-- `(challenge_id, seed_number)` is unique in `challenge_seeds`
-- `(team_enrollment_id, seed_id)` is unique in `games`
-- `(team_id, user_id, role)` is unique in `team_memberships`
+- `events.name` and `events.slug` are unique
+- `(event_id, name)` is unique in `event_teams`
+- `(event_id, stage_index)` is unique in `event_stages`
+- `(event_stage_id, template_index)` is unique in `event_game_templates`
+- `(event_team_id, event_game_template_id)` is unique in `event_games`
+- `(event_team_id, user_id, role)` is unique in `team_memberships`
 
 Service code maps PG error codes (`23505`) to domain error codes
-(e.g., `CHALLENGE_NAME_EXISTS`).
+(e.g., `EVENT_NAME_EXISTS`).
 
 ---
 
@@ -100,20 +106,22 @@ Responsibilities:
   - `requireAdmin` and `requireSuperAdmin`
 
 ### 4.2 Challenges Module
+### 4.2 Events Module
 
 Responsibilities:
 
-- List challenges
-- Create challenges
-- List seeds for a challenge
-- Create seeds
-- List teams associated with a challenge
+- List events
+- Create events
+- Manage stages for an event
+- List and create game templates for an event stage
+- List teams associated with an event
 
 Domain objects:
 
-- `Challenge`
-- `ChallengeSeed`
-- `ChallengeTeam`
+- `Event`
+- `EventStage`
+- `EventGameTemplate`
+- `EventTeam`
 
 ### 4.3 Teams Module
 
@@ -137,9 +145,9 @@ Responsibilities:
 
 - Insert game results (with error-handling on duplicates)
 - Fetch _hydrated_ game results:
-  - Seed
-  - Team
-  - Team player count
+  - Template
+  - Event team
+  - Event team player count
   - Players in seat order
 
 ### 4.5 Error Handling
@@ -190,8 +198,8 @@ Planned architecture:
 
 Planned pages:
 
-- Overview (all challenges)
-- Challenge detail (seeds + teams)
+- Overview (all events)
+- Event detail (stages + templates + teams)
 - Team detail (roster editing)
 - Results summary (2–6p versions)
 - Result detail (hydrated game result)

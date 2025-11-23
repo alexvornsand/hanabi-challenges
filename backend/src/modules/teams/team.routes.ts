@@ -2,7 +2,7 @@
 import { Router, Request, Response } from 'express';
 import {
   listTeamMembers,
-  createTeam,
+  createEventTeam,
   addTeamMember,
   listMemberCandidates,
   TeamRole,
@@ -11,17 +11,17 @@ import { authRequired, AuthenticatedRequest } from '../../middleware/authMiddlew
 
 const router = Router();
 
-// GET /api/teams/:id/members
+// GET /api/event-teams/:id/members
 router.get('/:id/members', async (req: Request, res: Response) => {
-  const teamId = Number(req.params.id);
+  const eventTeamId = Number(req.params.id);
 
-  if (Number.isNaN(teamId)) {
-    res.status(400).json({ error: 'Invalid team id' });
+  if (Number.isNaN(eventTeamId)) {
+    res.status(400).json({ error: 'Invalid event team id' });
     return;
   }
 
   try {
-    const members = await listTeamMembers(teamId);
+    const members = await listTeamMembers(eventTeamId);
     res.json(members);
   } catch (err) {
     console.error('Error fetching team members:', err);
@@ -29,13 +29,13 @@ router.get('/:id/members', async (req: Request, res: Response) => {
   }
 });
 
-// POST /api/teams (auth required)
+// POST /api/event-teams (auth required)
 router.post('/', authRequired, async (req: AuthenticatedRequest, res: Response) => {
-  const { challenge_id, name, team_size } = req.body;
+  const { event_id, name, team_size } = req.body;
 
-  if (!challenge_id || !name || team_size == null) {
+  if (!event_id || !name || team_size == null) {
     res.status(400).json({
-      error: 'challenge_id, name, and team_size are required',
+      error: 'event_id, name, and team_size are required',
     });
     return;
   }
@@ -49,8 +49,8 @@ router.post('/', authRequired, async (req: AuthenticatedRequest, res: Response) 
   }
 
   try {
-    const team = await createTeam({
-      challenge_id,
+    const team = await createEventTeam({
+      event_id,
       name,
       team_size: parsedTeamSize,
     });
@@ -59,7 +59,7 @@ router.post('/', authRequired, async (req: AuthenticatedRequest, res: Response) 
   } catch (err) {
     if (err.code === 'TEAM_CREATE_CONFLICT') {
       res.status(409).json({
-        error: 'Team name must be unique within the challenge',
+        error: 'Team name must be unique within the event',
       });
       return;
     }
@@ -69,13 +69,13 @@ router.post('/', authRequired, async (req: AuthenticatedRequest, res: Response) 
   }
 });
 
-// POST /api/teams/:id/members (auth required)
+// POST /api/event-teams/:id/members (auth required)
 router.post('/:id/members', authRequired, async (req: Request, res: Response) => {
-  const teamId = Number(req.params.id);
+  const eventTeamId = Number(req.params.id);
   const { user_id, role, is_listed = true } = req.body;
 
-  if (Number.isNaN(teamId)) {
-    res.status(400).json({ error: 'Invalid team id' });
+  if (Number.isNaN(eventTeamId)) {
+    res.status(400).json({ error: 'Invalid event team id' });
     return;
   }
 
@@ -95,7 +95,7 @@ router.post('/:id/members', authRequired, async (req: Request, res: Response) =>
 
   try {
     const member = await addTeamMember({
-      team_id: teamId,
+      event_team_id: eventTeamId,
       user_id,
       role: role as TeamRole,
       is_listed,
@@ -115,18 +115,18 @@ router.post('/:id/members', authRequired, async (req: Request, res: Response) =>
   }
 });
 
-// GET /api/teams/:id/member-candidates (auth required)
+// GET /api/event-teams/:id/member-candidates (auth required)
 router.get('/:id/member-candidates', authRequired, async (req: Request, res: Response) => {
-  const teamId = Number(req.params.id);
+  const eventTeamId = Number(req.params.id);
   const queryParam = (req.query.query as string) || '';
 
-  if (Number.isNaN(teamId)) {
-    res.status(400).json({ error: 'Invalid team id' });
+  if (Number.isNaN(eventTeamId)) {
+    res.status(400).json({ error: 'Invalid event team id' });
     return;
   }
 
   try {
-    const candidates = await listMemberCandidates(teamId, queryParam);
+    const candidates = await listMemberCandidates(eventTeamId, queryParam);
     res.json(candidates);
   } catch (err) {
     console.error('Error searching member candidates:', err);

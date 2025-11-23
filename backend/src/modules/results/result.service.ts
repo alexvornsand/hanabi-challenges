@@ -5,8 +5,8 @@ export type ZeroReason = 'Strike Out' | 'Time Out' | 'VTK' | null;
 
 export interface GameResultRow {
   id: number;
-  team_id: number;
-  seed_id: number;
+  event_team_id: number;
+  event_game_template_id: number;
   game_id: number | null; // hanab.live id
   score: number;
   zero_reason: ZeroReason;
@@ -17,22 +17,25 @@ export interface GameResultRow {
 }
 
 export interface GameResultDetail extends GameResultRow {
-  challenge_id: number;
-  seed_number: number;
-  team_id: number;
-  team_name: string;
+  event_id: number;
+  event_stage_id: number;
+  stage_index: number;
+  stage_label: string;
+  stage_type: 'SINGLE' | 'ROUND_ROBIN' | 'BRACKET' | 'GAUNTLET';
+  template_index: number;
+  event_team_name: string;
   player_count: number;
   players: string[]; // display names in seat order
 }
 
 /**
  * Create a game result: insert into games with result fields.
- * Assumes team_id and seed_id are valid and
- * uniqueness (team_id, seed_id) is enforced by the DB.
+ * Assumes event_team_id and event_game_template_id are valid and
+ * uniqueness (event_team_id, event_game_template_id) is enforced by the DB.
  */
 export async function createGameResult(input: {
-  team_id: number;
-  seed_id: number;
+  event_team_id: number;
+  event_game_template_id: number;
   game_id?: number | null; // hanab.live
   score: number;
   zero_reason?: ZeroReason;
@@ -41,8 +44,8 @@ export async function createGameResult(input: {
   played_at?: string | null;
 }): Promise<GameResultRow> {
   const {
-    team_id,
-    seed_id,
+    event_team_id,
+    event_game_template_id,
     game_id = null,
     score,
     zero_reason = null,
@@ -54,9 +57,9 @@ export async function createGameResult(input: {
   try {
     const result = await pool.query(
       `
-      INSERT INTO games (
-        team_id,
-        seed_id,
+      INSERT INTO event_games (
+        event_team_id,
+        event_game_template_id,
         game_id,
         score,
         zero_reason,
@@ -67,8 +70,8 @@ export async function createGameResult(input: {
       VALUES ($1, $2, $3, $4, $5, $6, $7, COALESCE($8, NOW()))
       RETURNING
         id,
-        team_id,
-        seed_id,
+        event_team_id,
+        event_game_template_id,
         game_id,
         score,
         zero_reason,
@@ -78,8 +81,8 @@ export async function createGameResult(input: {
         created_at;
       `,
       [
-        team_id,
-        seed_id,
+        event_team_id,
+        event_game_template_id,
         game_id,
         score,
         zero_reason,
@@ -92,7 +95,7 @@ export async function createGameResult(input: {
     return result.rows[0];
   } catch (err) {
     if ((err as { code?: string }).code === '23505') {
-      const e = new Error('A game result already exists for this team and seed');
+      const e = new Error('A game result already exists for this team and template');
       (e as { code?: string }).code = 'GAME_RESULT_EXISTS';
       throw e;
     }
@@ -103,15 +106,15 @@ export async function createGameResult(input: {
 
 /**
  * Get a fully-hydrated result by games.id
- * (includes seed, team, players, etc.)
+ * (includes template, team, players, etc.)
  */
 export async function getGameResultById(id: number): Promise<GameResultDetail | null> {
   const result = await pool.query(
     `
     SELECT
       g.id,
-      g.team_id,
-      g.seed_id,
+      g.event_team_id,
+      g.event_game_template_id,
       g.game_id,
       g.score,
       g.zero_reason,
@@ -119,21 +122,26 @@ export async function getGameResultById(id: number): Promise<GameResultDetail | 
       g.notes,
       g.played_at,
       g.created_at,
-      cs.challenge_id,
-      cs.seed_number,
-      t.name AS team_name,
+      es.event_id,
+      es.event_stage_id,
+      es.stage_index,
+      es.label AS stage_label,
+      es.stage_type,
+      egt.template_index,
+      t.name AS event_team_name,
       t.team_size AS player_count,
       array_remove(array_agg(u.display_name ORDER BY u.display_name), NULL) AS players
-    FROM games g
-    JOIN challenge_seeds cs ON cs.id = g.seed_id
-    JOIN teams t ON t.id = g.team_id
-    LEFT JOIN game_participants gp ON gp.game_id = g.id
+    FROM event_games g
+    JOIN event_game_templates egt ON egt.id = g.event_game_template_id
+    JOIN event_stages es ON es.event_stage_id = egt.event_stage_id
+    JOIN event_teams t ON t.id = g.event_team_id
+    LEFT JOIN game_participants gp ON gp.event_game_id = g.id
     LEFT JOIN users u ON u.id = gp.user_id
     WHERE g.id = $1
     GROUP BY
       g.id,
-      g.team_id,
-      g.seed_id,
+      g.event_team_id,
+      g.event_game_template_id,
       g.game_id,
       g.score,
       g.zero_reason,
@@ -141,8 +149,12 @@ export async function getGameResultById(id: number): Promise<GameResultDetail | 
       g.notes,
       g.played_at,
       g.created_at,
-      cs.challenge_id,
-      cs.seed_number,
+      es.event_id,
+      es.event_stage_id,
+      es.stage_index,
+      es.label,
+      es.stage_type,
+      egt.template_index,
       t.name,
       t.team_size;
     `,

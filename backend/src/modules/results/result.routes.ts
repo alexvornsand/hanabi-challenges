@@ -7,12 +7,12 @@ const router = Router();
 
 /**
  * POST /api/results
- * Create a new game result (i.e., insert a row into games).
+ * Create a new game result (i.e., insert a row into event_games).
  *
  * Body:
  * {
- *   "team_id": number,
- *   "seed_id": number,
+ *   "event_team_id": number,
+ *   "event_game_template_id": number,
  *   "game_id": number | null,          // hanab.live id
  *   "score": number,
  *   "zero_reason": "Strike Out" | "Time Out" | "VTK" | null,
@@ -23,8 +23,8 @@ const router = Router();
  */
 router.post('/', authRequired, async (req: Request, res: Response) => {
   const {
-    team_id,
-    seed_id,
+    event_team_id,
+    event_game_template_id,
     game_id,
     score,
     zero_reason,
@@ -33,9 +33,9 @@ router.post('/', authRequired, async (req: Request, res: Response) => {
     played_at,
   } = req.body;
 
-  if (team_enrollment_id == null || seed_id == null || score == null) {
+  if (event_team_id == null || event_game_template_id == null || score == null) {
     res.status(400).json({
-      error: 'team_id, seed_id, and score are required',
+      error: 'event_team_id, event_game_template_id, and score are required',
     });
     return;
   }
@@ -54,8 +54,8 @@ router.post('/', authRequired, async (req: Request, res: Response) => {
 
   try {
     const row = await createGameResult({
-      team_id,
-      seed_id,
+      event_team_id,
+      event_game_template_id,
       game_id: game_id ?? null,
       score,
       zero_reason: zero_reason as ZeroReason,
@@ -68,7 +68,7 @@ router.post('/', authRequired, async (req: Request, res: Response) => {
   } catch (err) {
     if (err.code === 'GAME_RESULT_EXISTS') {
       res.status(409).json({
-        error: 'A game result already exists for this team and seed',
+        error: 'A game result already exists for this team and template',
       });
       return;
     }
@@ -80,7 +80,7 @@ router.post('/', authRequired, async (req: Request, res: Response) => {
 
 /**
  * GET /api/results/:id
- * Fetch a fully-hydrated result by games.id
+ * Fetch a fully-hydrated result by event_games.id
  */
 router.get('/:id', async (req: Request, res: Response) => {
   const id = Number(req.params.id);

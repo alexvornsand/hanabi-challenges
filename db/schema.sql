@@ -1,13 +1,14 @@
 -- Enable extensions
 CREATE EXTENSION IF NOT EXISTS citext;
 
--- Drop tables in dependency order (children first)
+DROP TABLE IF EXISTS event_stage_team_statuses CASCADE;
 DROP TABLE IF EXISTS game_participants CASCADE;
-DROP TABLE IF EXISTS games CASCADE;
-DROP TABLE IF EXISTS challenge_seeds CASCADE;
+DROP TABLE IF EXISTS event_games CASCADE;
+DROP TABLE IF EXISTS event_game_templates CASCADE;
 DROP TABLE IF EXISTS team_memberships CASCADE;
-DROP TABLE IF EXISTS teams CASCADE;
-DROP TABLE IF EXISTS challenges CASCADE;
+DROP TABLE IF EXISTS event_teams CASCADE;
+DROP TABLE IF EXISTS event_stages CASCADE;
+DROP TABLE IF EXISTS events CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
 
 ------------------------------------------------------------
@@ -23,12 +24,11 @@ CREATE TABLE users (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-------------------------------------------------------------
--- CHALLENGES
+-- EVENTS
 -- Each row is a concrete run, e.g. "No Variant 2025"
 ------------------------------------------------------------
 
-CREATE TABLE challenges (
+CREATE TABLE events (
   id SERIAL PRIMARY KEY,
   slug TEXT NOT NULL UNIQUE,
   name TEXT NOT NULL UNIQUE,
@@ -40,16 +40,16 @@ CREATE TABLE challenges (
 );
 
 ------------------------------------------------------------
--- TEAMS (scoped to a single challenge)
+-- EVENT TEAMS (scoped to a single event)
 ------------------------------------------------------------
 
-CREATE TABLE teams (
+CREATE TABLE event_teams (
   id SERIAL PRIMARY KEY,
-  challenge_id INTEGER NOT NULL REFERENCES challenges(id) ON DELETE CASCADE,
+  event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   team_size INTEGER NOT NULL CHECK (team_size IN (2, 3, 4, 5, 6)),
-  UNIQUE (challenge_id, name)
+  UNIQUE (event_id, name)
 );
 
 ------------------------------------------------------------
@@ -58,39 +58,57 @@ CREATE TABLE teams (
 
 CREATE TABLE team_memberships (
   id SERIAL PRIMARY KEY,
-  team_id INTEGER NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+  event_team_id INTEGER NOT NULL REFERENCES event_teams(id) ON DELETE CASCADE,
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   role TEXT NOT NULL CHECK (role IN ('PLAYER', 'STAFF')),
   is_listed BOOLEAN NOT NULL DEFAULT TRUE,
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE (team_id, user_id, role)
+  UNIQUE (event_team_id, user_id, role)
 );
 
 ------------------------------------------------------------
--- CHALLENGE SEEDS
--- Fixed seeds per challenge
+-- EVENT STAGES
+-- Ordered collection of stages for an event
 ------------------------------------------------------------
 
-CREATE TABLE challenge_seeds (
-  id SERIAL PRIMARY KEY,
-  challenge_id INTEGER NOT NULL REFERENCES challenges(id) ON DELETE CASCADE,
-  seed_number INTEGER NOT NULL,  -- typically 1..100 within the challenge
-  variant TEXT NOT NULL DEFAULT 'No Variant',  -- e.g. 'No Variant', 'Rainbow', etc.
-  -- seed_payload could contain the actual RNG seed or other identifying data later
-  seed_payload TEXT,
+CREATE TABLE event_stages (
+  event_stage_id SERIAL PRIMARY KEY,
+  event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  stage_index INTEGER NOT NULL,
+  label TEXT NOT NULL,
+  stage_type TEXT NOT NULL CHECK (stage_type IN ('SINGLE', 'ROUND_ROBIN', 'BRACKET', 'GAUNTLET')),
+  starts_at TIMESTAMPTZ,
+  ends_at TIMESTAMPTZ,
+  config_json JSONB DEFAULT '{}'::jsonb,
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE (challenge_id, seed_number)
+  UNIQUE (event_id, stage_index)
 );
 
 ------------------------------------------------------------
--- GAMES
--- A single logged play of (team, seed)
+-- EVENT GAME TEMPLATES
+-- Fixed templates per event stage
 ------------------------------------------------------------
 
-CREATE TABLE games (
+CREATE TABLE event_game_templates (
   id SERIAL PRIMARY KEY,
-  team_id INTEGER NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
-  seed_id INTEGER NOT NULL REFERENCES challenge_seeds(id) ON DELETE CASCADE,
+  event_stage_id INTEGER NOT NULL REFERENCES event_stages(event_stage_id) ON DELETE CASCADE,
+  template_index INTEGER NOT NULL,
+  variant TEXT NOT NULL DEFAULT 'No Variant',  -- e.g. 'No Variant', 'Rainbow', etc.
+  seed_payload TEXT, -- payload for this template
+  metadata_json JSONB DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE (event_stage_id, template_index)
+);
+
+------------------------------------------------------------
+-- EVENT GAMES
+-- A single logged play of (event_team, event_game_template)
+------------------------------------------------------------
+
+CREATE TABLE event_games (
+  id SERIAL PRIMARY KEY,
+  event_team_id INTEGER NOT NULL REFERENCES event_teams(id) ON DELETE CASCADE,
+  event_game_template_id INTEGER NOT NULL REFERENCES event_game_templates(id) ON DELETE CASCADE,
   game_id INTEGER,
   score INTEGER NOT NULL,
   zero_reason TEXT
@@ -99,7 +117,7 @@ CREATE TABLE games (
   notes TEXT,
   played_at TIMESTAMPTZ DEFAULT NOW(),
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE (team_id, seed_id)
+  UNIQUE (event_team_id, event_game_template_id)
 );
 
 ------------------------------------------------------------
@@ -109,8 +127,23 @@ CREATE TABLE games (
 
 CREATE TABLE game_participants (
   id SERIAL PRIMARY KEY,
-  game_id INTEGER NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+  event_game_id INTEGER NOT NULL REFERENCES event_games(id) ON DELETE CASCADE,
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE (game_id, user_id)
+  UNIQUE (event_game_id, user_id)
+);
+
+------------------------------------------------------------
+-- EVENT STAGE TEAM STATUSES
+-- Per-team progress through a stage
+------------------------------------------------------------
+
+CREATE TABLE event_stage_team_statuses (
+  event_stage_id INTEGER NOT NULL REFERENCES event_stages(event_stage_id) ON DELETE CASCADE,
+  event_team_id INTEGER NOT NULL REFERENCES event_teams(id) ON DELETE CASCADE,
+  status TEXT NOT NULL CHECK (status IN ('not_started', 'in_progress', 'complete', 'eliminated')),
+  completed_at TIMESTAMPTZ,
+  metadata_json JSONB DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  PRIMARY KEY (event_stage_id, event_team_id)
 );

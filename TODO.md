@@ -1,4 +1,4 @@
-# Hanabi Challenges – Project TODO
+# Hanabi Events – Project TODO
 
 A sequential, hierarchical outline of work for the project, starting from a blank repo.  
 Items that are already done are marked with [x].  
@@ -49,7 +49,7 @@ Items not yet done are marked with [ ].
 ### 1.1 Schema Files & Structure
 
 - [x] Maintain db/schema.sql defining all tables
-- [x] Maintain db/sample_data.sql with initial users, challenges, seeds, teams, enrollments, and game data
+- [x] Maintain db/sample_data.sql with initial users, events, stages, templates, teams, and game data
 
 ### 1.2 DB Access Layer
 
@@ -109,13 +109,13 @@ Items not yet done are marked with [ ].
 
 ## 4. Backend: Core Modules
 
-### 4.1 Challenges Module
+### 4.1 Events Module
 
-- [x] listChallenges
-- [x] createChallenge (+ conflict mapping)
-- [x] listChallengeSeeds
-- [x] createChallengeSeed (+ conflict mapping)
-- [x] listChallengeTeams
+- [x] listEvents
+- [x] createEvent (+ conflict mapping)
+- [x] listEventGameTemplates
+- [x] createEventGameTemplate (+ conflict mapping)
+- [x] listEventTeams
 
 #### Future Improvements
 

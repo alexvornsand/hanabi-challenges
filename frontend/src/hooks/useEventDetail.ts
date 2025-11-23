@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { getJson, ApiError } from '../lib/api';
 
-export type ChallengeDetail = {
+export type EventDetail = {
   id: number;
   name: string;
   slug: string;
@@ -13,39 +13,39 @@ export type ChallengeDetail = {
 };
 
 type State = {
-  challenge: ChallengeDetail | null;
+  event: EventDetail | null;
   loading: boolean;
   error: string | null;
   notFound: boolean;
 };
 
-export function useChallengeDetail(slug: string | undefined) {
+export function useEventDetail(slug: string | undefined) {
   const [state, setState] = useState<State>(() =>
     !slug
       ? {
-          challenge: null,
+          event: null,
           loading: false,
-          error: 'No challenge specified',
+          error: 'No event specified',
           notFound: false,
         }
       : {
-          challenge: null,
+          event: null,
           loading: true,
           error: null,
           notFound: false,
-        }
+        },
   );
 
   useEffect(() => {
     // If there's no slug, we don't run the effect at all.
-    // The "no challenge specified" state is handled in the initializer above.
+    // The "no event specified" state is handled in the initializer above.
     if (!slug) {
       return;
     }
 
     let cancelled = false;
 
-    async function fetchChallenge() {
+    async function fetchEvent() {
       setState((prev) => ({
         ...prev,
         loading: true,
@@ -54,13 +54,13 @@ export function useChallengeDetail(slug: string | undefined) {
       }));
 
       try {
-        // getJson will add /api → /api/challenges/:slug
+        // getJson will add /api → /api/events/:slug
         const encodedSlug = encodeURIComponent(slug as string);
-        const data = await getJson<ChallengeDetail>(`/challenges/${encodedSlug}`);
+        const data = await getJson<EventDetail>(`/events/${encodedSlug}`);
 
         if (!cancelled) {
           setState({
-            challenge: data,
+            event: data,
             loading: false,
             error: null,
             notFound: false,
@@ -71,24 +71,24 @@ export function useChallengeDetail(slug: string | undefined) {
 
         if (err instanceof ApiError && err.status === 404) {
           setState({
-            challenge: null,
+            event: null,
             loading: false,
             error: null,
             notFound: true,
           });
         } else {
-          console.error('Failed to load challenge', err);
+          console.error('Failed to load event', err);
           setState({
-            challenge: null,
+            event: null,
             loading: false,
-            error: 'Failed to load challenge. Please try again.',
+            error: 'Failed to load event. Please try again.',
             notFound: false,
           });
         }
       }
     }
 
-    fetchChallenge();
+    fetchEvent();
 
     return () => {
       cancelled = true;

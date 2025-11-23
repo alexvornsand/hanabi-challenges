@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { pool } from '../../src/config/db';
 import {
   listTeamMembers,
-  createTeamWithCreator,
+  createEventTeamWithCreator,
   addTeamMember,
   listMemberCandidates,
   TeamRole,
@@ -17,12 +17,14 @@ describe('team.service (integration)', () => {
     await pool.query(
       `
       TRUNCATE
+        event_stage_team_statuses,
         game_participants,
-        games,
-        challenge_seeds,
+        event_games,
+        event_game_templates,
         team_memberships,
-        teams,
-        challenges,
+        event_teams,
+        event_stages,
+        events,
         users
       RESTART IDENTITY CASCADE;
       `,
@@ -52,40 +54,40 @@ describe('team.service (integration)', () => {
     return map;
   }
 
-  async function seedChallengeAndTeam(teamName: string) {
-    const challengeRes = await pool.query(
+  async function seedEventAndTeam(teamName: string) {
+    const eventRes = await pool.query(
       `
-      INSERT INTO challenges (name, slug, short_description, long_description)
+      INSERT INTO events (name, slug, short_description, long_description)
       VALUES ($1, $2, $3, $4)
       RETURNING id;
       `,
       [
-        'Team Test Challenge',
-        'team-test-challenge',
+        'Team Test Event',
+        'team-test-event',
         'short desc',
-        'long description for team tests',
+        'long description for event team tests',
       ],
     );
-    const challengeId = challengeRes.rows[0].id as number;
+    const eventId = eventRes.rows[0].id as number;
 
     const teamRes = await pool.query(
       `
-      INSERT INTO teams (name, challenge_id, team_size)
+      INSERT INTO event_teams (name, event_id, team_size)
       VALUES ($1, $2, 3)
-      RETURNING id, name, challenge_id;
+      RETURNING id, name, event_id;
       `,
-      [teamName, challengeId],
+      [teamName, eventId],
     );
 
     return {
-      challengeId,
+      eventId,
       teamId: teamRes.rows[0].id as number,
     };
   }
 
   it('listTeamMembers returns expected members for a seeded team', async () => {
     const userIds = await seedUsers();
-    const { teamId } = await seedChallengeAndTeam('Lanterns');
+    const { teamId } = await seedEventAndTeam('Lanterns');
 
     const aliceId = userIds.get('alice')!;
     const bobId = userIds.get('bob')!;
@@ -94,7 +96,7 @@ describe('team.service (integration)', () => {
 
     await pool.query(
       `
-      INSERT INTO team_memberships (team_id, user_id, role, is_listed)
+      INSERT INTO team_memberships (event_team_id, user_id, role, is_listed)
       VALUES 
         ($1, $2, 'STAFF',  true),
         ($1, $3, 'PLAYER', true),
@@ -115,26 +117,26 @@ describe('team.service (integration)', () => {
   it('createTeamWithCreator creates a team and STAFF membership', async () => {
     const userIds = await seedUsers();
 
-    const challengeRes = await pool.query(
+    const eventRes = await pool.query(
       `
-      INSERT INTO challenges (name, slug, short_description, long_description)
+      INSERT INTO events (name, slug, short_description, long_description)
       VALUES ($1, $2, $3, $4)
       RETURNING id;
       `,
       [
-        'Create Team Challenge',
-        'create-team-challenge',
+        'Create Team Event',
+        'create-team-event',
         'short desc',
         'long description for create team test',
       ],
     );
-    const challengeId = challengeRes.rows[0].id as number;
+    const eventId = eventRes.rows[0].id as number;
 
     const bobId = userIds.get('bob')!;
     const TEST_TEAM_NAME = 'Unit Test Team';
 
-    const team = await createTeamWithCreator({
-      challenge_id: challengeId,
+    const team = await createEventTeamWithCreator({
+      event_id: eventId,
       name: TEST_TEAM_NAME,
       team_size: 3,
       creator_user_id: bobId,
@@ -142,14 +144,14 @@ describe('team.service (integration)', () => {
 
     expect(team.id).toBeGreaterThan(0);
     expect(team.name).toBe(TEST_TEAM_NAME);
-    expect(team.challenge_id).toBe(challengeId);
+    expect(team.event_id).toBe(eventId);
     expect(team.team_size).toBe(3);
 
     const membershipRes = await pool.query(
       `
       SELECT role
       FROM team_memberships
-      WHERE team_id = $1 AND user_id = $2
+      WHERE event_team_id = $1 AND user_id = $2
       `,
       [team.id, bobId],
     );
@@ -161,39 +163,39 @@ describe('team.service (integration)', () => {
   it('addTeamMember adds a member and rejects duplicate roles', async () => {
     const userIds = await seedUsers();
 
-    const challengeRes = await pool.query(
+    const eventRes = await pool.query(
       `
-      INSERT INTO challenges (name, slug, short_description, long_description)
+      INSERT INTO events (name, slug, short_description, long_description)
       VALUES ($1, $2, $3, $4)
       RETURNING id;
       `,
       [
-        'Add Member Challenge',
-        'add-member-challenge',
+        'Add Member Event',
+        'add-member-event',
         'short desc',
         'long description for add member test',
       ],
     );
-    const challengeId = challengeRes.rows[0].id as number;
+    const eventId = eventRes.rows[0].id as number;
 
     const bobId = userIds.get('bob')!;
     const carolId = userIds.get('carol')!;
 
-    const team = await createTeamWithCreator({
-      challenge_id: challengeId,
+    const team = await createEventTeamWithCreator({
+      event_id: eventId,
       name: 'Member Test Team',
       team_size: 3,
       creator_user_id: bobId,
     });
 
     const member = await addTeamMember({
-      team_id: team.id,
+      event_team_id: team.id,
       user_id: carolId,
       role: 'PLAYER' as TeamRole,
       is_listed: true,
     });
 
-    expect(member.team_id).toBe(team.id);
+    expect(member.event_team_id).toBe(team.id);
     expect(member.user_id).toBe(carolId);
     expect(member.role).toBe('PLAYER');
     expect(member.display_name).toBe('carol');
@@ -204,7 +206,7 @@ describe('team.service (integration)', () => {
 
     await expect(
       addTeamMember({
-        team_id: team.id,
+        event_team_id: team.id,
         user_id: carolId,
         role: 'PLAYER' as TeamRole,
         is_listed: true,
@@ -214,7 +216,7 @@ describe('team.service (integration)', () => {
 
   it('listMemberCandidates returns users not on the team and respects prefix search', async () => {
     const userIds = await seedUsers();
-    const { teamId } = await seedChallengeAndTeam('Lanterns');
+    const { teamId } = await seedEventAndTeam('Lanterns');
 
     const aliceId = userIds.get('alice')!;
     const bobId = userIds.get('bob')!;
@@ -223,7 +225,7 @@ describe('team.service (integration)', () => {
 
     await pool.query(
       `
-      INSERT INTO team_memberships (team_id, user_id, role, is_listed)
+      INSERT INTO team_memberships (event_team_id, user_id, role, is_listed)
       VALUES
         ($1, $2, 'STAFF',  true),
         ($1, $3, 'PLAYER', true),

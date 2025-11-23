@@ -2,12 +2,14 @@ BEGIN;
 
 -- Wipe existing data (and reset sequences)
 TRUNCATE TABLE
+  event_stage_team_statuses,
   game_participants,
-  games,
+  event_games,
+  event_game_templates,
   team_memberships,
-  teams,
-  challenge_seeds,
-  challenges,
+  event_teams,
+  event_stages,
+  events,
   users
 RESTART IDENTITY CASCADE;
 
@@ -29,9 +31,9 @@ VALUES
 
 
 -- ================================
--- Challenges
+-- Events
 -- ================================
-INSERT INTO challenges (
+INSERT INTO events (
   name,
   slug,
   short_description,
@@ -43,7 +45,7 @@ VALUES
   (
     'No Variant 2025',
     'no-var-2025',
-    'No Variant Challenge 2025',
+    'No Variant Event 2025',
     $$Over the next wee while, we're going to play 100 games of No Var and aim to get the highest % of max score we can.\n\nTiers:\nover 70% max scores: 🥉\nBronze\nover 80% max scores: 🥈\nSilver\nover 90% max scores: 🥇\nGold\nover 95% max scores: 💎\nDiamond$$,
     '2025-01-01T00:00:00Z',
     '2025-12-31T23:59:59Z'
@@ -51,22 +53,35 @@ VALUES
   (
     'No Variant 2026',
     'no-var-2026',
-    'No Variant Challenge 2026',
+    'No Variant Event 2026',
     $$Over the next wee while, we're going to play 100 games of No Var and aim to get the highest % of max score we can.\n\nTiers:\nover 70% max scores: 🥉\nBronze\nover 80% max scores: 🥈\nSilver\nover 90% max scores: 🥇\nGold\nover 95% max scores: 💎\nDiamond$$,
     '2026-01-01T00:00:00Z',
     '2026-12-31T23:59:59Z'
   );
 
--- challenge_ids:
+-- event_ids:
 -- 1 = No Variant 2025
 -- 2 = No Variant 2026
 
 
 -- ================================
--- Challenge seeds
+-- Event stages
 -- ================================
--- For challenge 1: seed_numbers 1..5
-INSERT INTO challenge_seeds (challenge_id, seed_number, variant, seed_payload)
+INSERT INTO event_stages (event_id, stage_index, label, stage_type, starts_at, ends_at)
+VALUES
+  (1, 1, 'Main Stage', 'SINGLE', '2025-01-01T00:00:00Z', '2025-12-31T23:59:59Z'),
+  (2, 1, 'Main Stage', 'SINGLE', '2026-01-01T00:00:00Z', '2026-12-31T23:59:59Z');
+
+-- event_stage_ids:
+-- 1 = Event 1 Stage 1
+-- 2 = Event 2 Stage 1
+
+
+-- ================================
+-- Event game templates
+-- ================================
+-- For event 1 stage 1: template_index 1..5
+INSERT INTO event_game_templates (event_stage_id, template_index, variant, seed_payload)
 VALUES
   (1, 1, 'NO_VARIANT', 'NVC2025-1'),
   (1, 2, 'NO_VARIANT', 'NVC2025-2'),
@@ -74,8 +89,8 @@ VALUES
   (1, 4, 'NO_VARIANT', 'NVC2025-4'),
   (1, 5, 'NO_VARIANT', 'NVC2025-5');
 
--- For challenge 2: seed_numbers 1..5
-INSERT INTO challenge_seeds (challenge_id, seed_number, variant, seed_payload)
+-- For event 2 stage 1: template_index 1..5
+INSERT INTO event_game_templates (event_stage_id, template_index, variant, seed_payload)
 VALUES
   (2, 1, 'NO_VARIANT', 'NVC2026-1'),
   (2, 2, 'NO_VARIANT', 'NVC2026-2'),
@@ -83,28 +98,28 @@ VALUES
   (2, 4, 'NO_VARIANT', 'NVC2026-4'),
   (2, 5, 'NO_VARIANT', 'NVC2026-5');
 
--- seed_ids:
--- 1..5  -> 2025 seeds (1..5)
--- 6..10 -> 2026 seeds (1..5)
+-- event_game_template_ids:
+-- 1..5  -> 2025 templates (index 1..5)
+-- 6..10 -> 2026 templates (index 1..5)
 
 
 -- ================================
--- Teams
+-- Event teams
 -- ================================
 -- team_size = number of players at the table (per game), not roster size.
 
-INSERT INTO teams (challenge_id, name, team_size)
+INSERT INTO event_teams (event_id, name, team_size)
 VALUES
   (1, 'Lanterns',      2), -- 2p team (roster 3 players + 1 staff)
   (1, 'Clue Crew',     3), -- 3p team
   (2, 'Faded Signals', 4), -- 4p team
   (2, 'Risky Fuses',   3); -- 3p team
 
--- team_ids:
--- 1 = Lanterns       (challenge 1)
--- 2 = Clue Crew      (challenge 1)
--- 3 = Faded Signals  (challenge 2)
--- 4 = Risky Fuses    (challenge 2)
+-- event_team_ids:
+-- 1 = Lanterns       (event 1)
+-- 2 = Clue Crew      (event 1)
+-- 3 = Faded Signals  (event 2)
+-- 4 = Risky Fuses    (event 2)
 
 
 -- ================================
@@ -116,7 +131,7 @@ VALUES
 -- Team 1: Lanterns (2p team)
 -- Staff:  alice
 -- Players: bob, cathy, donald  (3-player roster, 2 play each game)
-INSERT INTO team_memberships (team_id, user_id, role, is_listed)
+INSERT INTO team_memberships (event_team_id, user_id, role, is_listed)
 VALUES
   (1, 1, 'STAFF',  true),  -- alice
   (1, 2, 'PLAYER', true),  -- bob
@@ -125,7 +140,7 @@ VALUES
 
 -- Team 2: Clue Crew (3p team)
 -- Players: bob, emily, frank
-INSERT INTO team_memberships (team_id, user_id, role, is_listed)
+INSERT INTO team_memberships (event_team_id, user_id, role, is_listed)
 VALUES
   (2, 2, 'PLAYER', true),  -- bob
   (2, 5, 'PLAYER', true),  -- emily
@@ -134,7 +149,7 @@ VALUES
 -- Team 3: Faded Signals (4p team)
 -- Staff:   cathy
 -- Players: alice, emily, frank, grace
-INSERT INTO team_memberships (team_id, user_id, role, is_listed)
+INSERT INTO team_memberships (event_team_id, user_id, role, is_listed)
 VALUES
   (3, 3, 'STAFF',  true),  -- cathy
   (3, 1, 'PLAYER', true),  -- alice
@@ -144,7 +159,7 @@ VALUES
 
 -- Team 4: Risky Fuses (3p team)
 -- Players: donald, emily, grace (3 players, all play each game)
-INSERT INTO team_memberships (team_id, user_id, role, is_listed)
+INSERT INTO team_memberships (event_team_id, user_id, role, is_listed)
 VALUES
   (4, 4, 'PLAYER', true),  -- donald
   (4, 5, 'PLAYER', true),  -- emily
@@ -152,20 +167,20 @@ VALUES
 
 
 -- ================================
--- Games (results)
+-- Event games (results)
 -- ================================
--- Assumes games(team_id, seed_id, game_id, score, zero_reason, bottom_deck_risk, notes, played_at).
+-- Assumes event_games(event_team_id, event_game_template_id, game_id, score, zero_reason, bottom_deck_risk, notes, played_at).
 -- Each team:
--- - plays seeds 1,2,3 for its challenge (no games for seeds 4,5)
--- - If seed 3 exists, 1 and 2 also exist.
+-- - plays templates 1,2,3 for its event (no games for templates 4,5)
+-- - If template 3 exists, 1 and 2 also exist.
 
--- Challenge 1 seeds: seed_ids 1,2,3
--- Challenge 2 seeds: seed_ids 6,7,8
+-- Event 1 templates: ids 1,2,3
+-- Event 2 templates: ids 6,7,8
 
--- Lanterns (team_id 1, 2p, challenge 1)
-INSERT INTO games (
-  team_id,
-  seed_id,
+-- Lanterns (event_team_id 1, 2p, event 1)
+INSERT INTO event_games (
+  event_team_id,
+  event_game_template_id,
   game_id,
   score,
   zero_reason,
@@ -174,14 +189,14 @@ INSERT INTO games (
   played_at
 )
 VALUES
-  (1, 1, 1001, 25, NULL,         2, 'Lanterns 2p – seed 1, clean',      '2025-02-01T20:00:00Z'),
-  (1, 2, 1002, 23, NULL,         4, 'Lanterns 2p – seed 2, minor risk', '2025-02-08T20:00:00Z'),
-  (1, 3, 1003,  0, 'Strike Out', 7, 'Lanterns 2p – seed 3, strike out', '2025-02-15T20:00:00Z');
+  (1, 1, 1001, 25, NULL,         2, 'Lanterns 2p – template 1, clean',      '2025-02-01T20:00:00Z'),
+  (1, 2, 1002, 23, NULL,         4, 'Lanterns 2p – template 2, minor risk', '2025-02-08T20:00:00Z'),
+  (1, 3, 1003,  0, 'Strike Out', 7, 'Lanterns 2p – template 3, strike out', '2025-02-15T20:00:00Z');
 
--- Clue Crew (team_id 2, 3p, challenge 1)
-INSERT INTO games (
-  team_id,
-  seed_id,
+-- Clue Crew (event_team_id 2, 3p, event 1)
+INSERT INTO event_games (
+  event_team_id,
+  event_game_template_id,
   game_id,
   score,
   zero_reason,
@@ -190,14 +205,14 @@ INSERT INTO games (
   played_at
 )
 VALUES
-  (2, 1, 1004, 24, NULL,        3, 'Clue Crew 3p – seed 1, solid',    '2025-03-01T19:30:00Z'),
-  (2, 2, 1005, 21, NULL,        5, 'Clue Crew 3p – seed 2, messy',    '2025-03-08T19:30:00Z'),
-  (2, 3, 1006,  0, 'Time Out',  6, 'Clue Crew 3p – seed 3, time out', '2025-03-15T19:30:00Z');
+  (2, 1, 1004, 24, NULL,        3, 'Clue Crew 3p – template 1, solid',    '2025-03-01T19:30:00Z'),
+  (2, 2, 1005, 21, NULL,        5, 'Clue Crew 3p – template 2, messy',    '2025-03-08T19:30:00Z'),
+  (2, 3, 1006,  0, 'Time Out',  6, 'Clue Crew 3p – template 3, time out', '2025-03-15T19:30:00Z');
 
--- Faded Signals (team_id 3, 4p, challenge 2)
-INSERT INTO games (
-  team_id,
-  seed_id,
+-- Faded Signals (event_team_id 3, 4p, event 2)
+INSERT INTO event_games (
+  event_team_id,
+  event_game_template_id,
   game_id,
   score,
   zero_reason,
@@ -206,14 +221,14 @@ INSERT INTO games (
   played_at
 )
 VALUES
-  (3, 6, 2001, 26, NULL,       1, 'Faded Signals 4p – seed 1, near-perfect', '2026-01-10T21:00:00Z'),
-  (3, 7, 2002, 24, NULL,       3, 'Faded Signals 4p – seed 2, good',         '2026-01-17T21:00:00Z'),
-  (3, 8, 2003,  0, 'VTK',      8, 'Faded Signals 4p – seed 3, VTK loss',     '2026-01-24T21:00:00Z');
+  (3, 6, 2001, 26, NULL,       1, 'Faded Signals 4p – template 1, near-perfect', '2026-01-10T21:00:00Z'),
+  (3, 7, 2002, 24, NULL,       3, 'Faded Signals 4p – template 2, good',         '2026-01-17T21:00:00Z'),
+  (3, 8, 2003,  0, 'VTK',      8, 'Faded Signals 4p – template 3, VTK loss',     '2026-01-24T21:00:00Z');
 
--- Risky Fuses (team_id 4, 3p, challenge 2) – only seeds 1 & 2 (6 & 7)
-INSERT INTO games (
-  team_id,
-  seed_id,
+-- Risky Fuses (event_team_id 4, 3p, event 2) – only templates 1 & 2 (6 & 7)
+INSERT INTO event_games (
+  event_team_id,
+  event_game_template_id,
   game_id,
   score,
   zero_reason,
@@ -222,10 +237,10 @@ INSERT INTO games (
   played_at
 )
 VALUES
-  (4, 6, 2004, 22, NULL,       4, 'Risky Fuses 3p – seed 1, okay',    '2026-02-05T20:15:00Z'),
-  (4, 7, 2005, 18, NULL,       5, 'Risky Fuses 3p – seed 2, shaky',   '2026-02-12T20:15:00Z');
+  (4, 6, 2004, 22, NULL,       4, 'Risky Fuses 3p – template 1, okay',    '2026-02-05T20:15:00Z'),
+  (4, 7, 2005, 18, NULL,       5, 'Risky Fuses 3p – template 2, shaky',   '2026-02-12T20:15:00Z');
 
--- After these INSERTs, game_ids (PK) should be:
+-- After these INSERTs, event_game ids (PK) should be:
 -- 1..3   -> Lanterns games
 -- 4..6   -> Clue Crew games
 -- 7..9   -> Faded Signals games
@@ -238,67 +253,34 @@ VALUES
 -- Enrollment pattern now inferred from team_memberships + team_size.
 -- Lanterns 2p:   bob(2), cathy(3), donald(4)         [2 play each game]
 -- Clue Crew 3p:  bob(2), emily(5), frank(6)          [all 3 play]
--- Faded 4p:      alice(1), emily(5), frank(6), grace(7)  [all 4 play]
--- Risky 3p:      donald(4), emily(5), grace(7)       [all 3 play]
+-- Faded Signals 4p: alice(1), emily(5), frank(6), grace(7) [all 4 play]
+-- Risky Fuses 3p: donald(4), emily(5), grace(7)      [all 3 play]
 
 -- Lanterns games (game_ids 1,2,3) – 2 players per game
-INSERT INTO game_participants (game_id, user_id)
+INSERT INTO game_participants (event_game_id, user_id)
 VALUES
-  -- game 1: bob + cathy
-  (1, 2),
-  (1, 3),
-  -- game 2: bob + donald
-  (2, 2),
-  (2, 4),
-  -- game 3: cathy + donald
-  (3, 3),
-  (3, 4);
+  (1, 2), (1, 3),
+  (2, 2), (2, 3),
+  (3, 3), (3, 4);
 
 -- Clue Crew games (game_ids 4,5,6) – 3 players per game
-INSERT INTO game_participants (game_id, user_id)
+INSERT INTO game_participants (event_game_id, user_id)
 VALUES
-  -- game 4
-  (4, 2),
-  (4, 5),
-  (4, 6),
-  -- game 5
-  (5, 2),
-  (5, 5),
-  (5, 6),
-  -- game 6
-  (6, 2),
-  (6, 5),
-  (6, 6);
+  (4, 2), (4, 5), (4, 6),
+  (5, 2), (5, 5), (5, 6),
+  (6, 2), (6, 5), (6, 6);
 
 -- Faded Signals games (game_ids 7,8,9) – 4 players per game
-INSERT INTO game_participants (game_id, user_id)
+INSERT INTO game_participants (event_game_id, user_id)
 VALUES
-  -- game 7
-  (7, 1),
-  (7, 5),
-  (7, 6),
-  (7, 7),
-  -- game 8
-  (8, 1),
-  (8, 5),
-  (8, 6),
-  (8, 7),
-  -- game 9
-  (9, 1),
-  (9, 5),
-  (9, 6),
-  (9, 7);
+  (7, 1), (7, 5), (7, 6), (7, 7),
+  (8, 1), (8, 5), (8, 6), (8, 7),
+  (9, 1), (9, 5), (9, 6), (9, 7);
 
 -- Risky Fuses games (game_ids 10,11) – 3 players per game
-INSERT INTO game_participants (game_id, user_id)
+INSERT INTO game_participants (event_game_id, user_id)
 VALUES
-  -- game 10
-  (10, 4),
-  (10, 5),
-  (10, 7),
-  -- game 11
-  (11, 4),
-  (11, 5),
-  (11, 7);
+  (10, 4), (10, 5), (10, 7),
+  (11, 4), (11, 5), (11, 7);
 
 COMMIT;

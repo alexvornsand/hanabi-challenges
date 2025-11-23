@@ -1,7 +1,7 @@
-# Hanabi Challenges
+# Hanabi Events
 
-Backend + (future) frontend for running structured Hanabi challenge
-instances, tracking teams, and recording game results.
+Backend + (future) frontend for running structured Hanabi event
+instances (formerly called "challenges"), tracking teams, and recording game results.
 
 ## Project Structure
 

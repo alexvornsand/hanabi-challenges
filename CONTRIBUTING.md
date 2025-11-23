@@ -91,7 +91,7 @@ A PR should include:
 
 Commit/PR naming style:
 
-feat: add endpoint for challenge updates  
+feat: add endpoint for event updates  
 fix: correct constraint in addTeamMember service  
 refactor: split seed routes into separate controller  
 docs: update README with setup instructions

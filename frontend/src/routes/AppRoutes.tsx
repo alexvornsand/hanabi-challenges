@@ -3,8 +3,8 @@ import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { MainLayout } from '../layouts/MainLayout';
 import { LandingPage } from '../pages/LandingPage';
-import { ChallengeArchivePage } from '../pages/ChallengeArchivePage';
-import { ChallengeDetailPage } from '../pages/ChallengeDetailPage';
+import { EventArchivePage } from '../pages/EventArchivePage';
+import { EventDetailPage } from '../pages/EventDetailPage';
 import { NotFoundPage } from '../pages/NotFoundPage';
 
 export function AppRoutes() {
@@ -15,11 +15,11 @@ export function AppRoutes() {
           {/* Home */}
           <Route index element={<LandingPage />} />
 
-          {/* Challenges */}
-          <Route path="challenges">
-            <Route index element={<ChallengeArchivePage />} />
-            <Route path=":slug" element={<ChallengeDetailPage />} />
-            <Route path=":slug/:teamSize" element={<ChallengeDetailPage />} />
+          {/* Events */}
+          <Route path="events">
+            <Route index element={<EventArchivePage />} />
+            <Route path=":slug" element={<EventDetailPage />} />
+            <Route path=":slug/:teamSize" element={<EventDetailPage />} />
           </Route>
 
           {/* Catch-all */}

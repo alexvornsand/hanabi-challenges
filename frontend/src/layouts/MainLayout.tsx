@@ -6,7 +6,7 @@ export const MainLayout: React.FC = () => {
     <div className="app-root">
       <header>
         <nav>
-          <Link to="/">Hanabi Challenges</Link> | <Link to="/challenges">Challenges</Link> |{' '}
+          <Link to="/">Hanabi Events</Link> | <Link to="/events">Events</Link> |{' '}
           <Link to="/statistics">Statistics</Link> | <Link to="/login">Log in</Link>
         </nav>
       </header>
@@ -16,7 +16,7 @@ export const MainLayout: React.FC = () => {
       </main>
 
       <footer>
-        <small>© {new Date().getFullYear()} Hanabi Challenges</small>
+        <small>© {new Date().getFullYear()} Hanabi Events</small>
       </footer>
     </div>
   );

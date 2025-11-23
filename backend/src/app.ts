@@ -9,7 +9,7 @@ app.use(express.json());
 
 // Friendly root
 app.get('/', (_req, res) => {
-  res.send('Hanabi Challenges API is running. Try /health or /api/challenges');
+  res.send('Hanabi Events API is running. Try /health or /api/events');
 });
 
 // Health check: verifies DB connectivity
