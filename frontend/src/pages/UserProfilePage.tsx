@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ApiError, getJson } from '../lib/api';
 import { UserPill } from '../components/UserPill';
 import { useAuth } from '../context/AuthContext';
@@ -92,6 +92,14 @@ export function UserProfilePage() {
           <p className="text-gray-600 text-sm">
             Joined: {new Date(user.created_at).toLocaleString()}
           </p>
+          <div className="flex gap-3 text-sm">
+            <Link className="text-blue-700 underline" to={`/users/${user.display_name}/events`}>
+              Events
+            </Link>
+            <Link className="text-blue-700 underline" to={`/users/${user.display_name}/badges`}>
+              Badges
+            </Link>
+          </div>
         </>
       )}
 

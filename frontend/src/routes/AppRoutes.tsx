@@ -9,6 +9,8 @@ import { LoginPage } from '../pages/LoginPage';
 import { UserPage } from '../pages/UserPage';
 import { UserProfilePage } from '../pages/UserProfilePage';
 import { NewUserPage } from '../pages/NewUserPage';
+import { UserEventsPage } from '../pages/UserEventsPage';
+import { UserBadgesPage } from '../pages/UserBadgesPage';
 import { NotFoundPage } from '../pages/NotFoundPage';
 
 export function AppRoutes() {
@@ -32,6 +34,8 @@ export function AppRoutes() {
           <Route path="new-user" element={<NewUserPage />} />
           <Route path="me" element={<UserPage />} />
           <Route path="users/:username" element={<UserProfilePage />} />
+          <Route path="users/:username/events" element={<UserEventsPage />} />
+          <Route path="users/:username/badges" element={<UserBadgesPage />} />
 
           {/* Catch-all */}
           <Route path="*" element={<NotFoundPage />} />

@@ -84,4 +84,37 @@ router.get('/users/:display_name', async (req: Request, res: Response) => {
   }
 });
 
+// GET /api/users/:display_name/events
+router.get('/users/:display_name/events', async (req: Request, res: Response) => {
+  const { display_name } = req.params;
+
+  try {
+    const result = await pool.query(
+      `
+      SELECT
+        et.id AS event_team_id,
+        et.name AS team_name,
+        et.team_size,
+        et.event_id,
+        e.name AS event_name,
+        e.slug AS event_slug,
+        e.starts_at,
+        e.ends_at
+      FROM event_teams et
+      JOIN team_memberships tm ON tm.event_team_id = et.id
+      JOIN users u ON u.id = tm.user_id
+      JOIN events e ON e.id = et.event_id
+      WHERE u.display_name = $1
+      ORDER BY e.starts_at NULLS LAST, et.id;
+      `,
+      [display_name],
+    );
+
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Error fetching user events:', err);
+    res.status(500).json({ error: 'Failed to fetch user events' });
+  }
+});
+
 export default router;
