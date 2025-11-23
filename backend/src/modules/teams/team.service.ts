@@ -11,6 +11,11 @@ export interface EventTeam {
   created_at: string;
 }
 
+export interface EventTeamDetail extends EventTeam {
+  event_slug: string;
+  event_name: string;
+}
+
 export interface TeamMember {
   id: number;
   event_team_id: number;
@@ -24,6 +29,24 @@ export interface TeamMember {
 export interface MemberCandidate {
   id: number;
   display_name: string;
+}
+
+export interface TeamGameSummary {
+  id: number;
+  event_game_template_id: number;
+  game_id: number | null;
+  score: number;
+  zero_reason: string | null;
+  bottom_deck_risk: number | null;
+  notes: string | null;
+  played_at: string;
+  event_stage_id: number;
+  stage_index: number;
+  stage_label: string;
+  stage_type: 'SINGLE' | 'ROUND_ROBIN' | 'BRACKET' | 'GAUNTLET';
+  template_index: number;
+  variant: string;
+  players: string[];
 }
 
 // List members of a team
@@ -226,4 +249,89 @@ export async function listMemberCandidates(
   );
 
   return result.rows;
+}
+
+// Get the basic detail for an event team (includes event slug/name)
+export async function getEventTeamDetail(eventTeamId: number): Promise<EventTeamDetail | null> {
+  const result = await pool.query(
+    `
+    SELECT
+      t.id,
+      t.event_id,
+      t.name,
+      t.team_size,
+      t.created_at,
+      e.slug AS event_slug,
+      e.name AS event_name
+    FROM event_teams t
+    JOIN events e ON e.id = t.event_id
+    WHERE t.id = $1;
+    `,
+    [eventTeamId],
+  );
+
+  if (result.rowCount === 0) return null;
+
+  return result.rows[0] as EventTeamDetail;
+}
+
+// List completed games for a team, grouped by stage in the query order
+export async function listTeamGames(eventTeamId: number): Promise<TeamGameSummary[]> {
+  const result = await pool.query(
+    `
+    SELECT
+      g.id,
+      g.event_game_template_id,
+      g.game_id,
+      g.score,
+      g.zero_reason,
+      g.bottom_deck_risk,
+      g.notes,
+      g.played_at,
+      es.event_stage_id,
+      es.stage_index,
+      es.label AS stage_label,
+      es.stage_type,
+      egt.template_index,
+      egt.variant,
+      array_remove(array_agg(u.display_name ORDER BY u.display_name), NULL) AS players
+    FROM event_games g
+    JOIN event_game_templates egt ON egt.id = g.event_game_template_id
+    JOIN event_stages es ON es.event_stage_id = egt.event_stage_id
+    LEFT JOIN game_participants gp ON gp.event_game_id = g.id
+    LEFT JOIN users u ON u.id = gp.user_id
+    WHERE g.event_team_id = $1
+    GROUP BY
+      g.id,
+      g.event_game_template_id,
+      g.game_id,
+      g.score,
+      g.zero_reason,
+      g.bottom_deck_risk,
+      g.notes,
+      g.played_at,
+      es.event_stage_id,
+      es.stage_index,
+      es.label,
+      es.stage_type,
+      egt.template_index,
+      egt.variant
+    ORDER BY es.stage_index, egt.template_index, g.id;
+    `,
+    [eventTeamId],
+  );
+
+  return result.rows.map((row) => {
+    let players: string[] = [];
+    if (Array.isArray(row.players)) {
+      players = row.players;
+    } else if (typeof row.players === 'string') {
+      players = row.players
+        .replace(/^\{|\}$/g, '')
+        .split(',')
+        .filter((p: string) => p.length > 0);
+    }
+
+    return { ...row, players } as TeamGameSummary;
+  });
 }

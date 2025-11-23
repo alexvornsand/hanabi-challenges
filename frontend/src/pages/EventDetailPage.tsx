@@ -131,7 +131,12 @@ export function EventDetailPage() {
                         className="border rounded-md px-3 py-2 bg-white/70 backdrop-blur-sm"
                       >
                         <div className="flex items-center justify-between">
-                          <span className="font-medium text-gray-900">{team.name}</span>
+                          <Link
+                            to={`/events/${event.slug}/teams/${team.id}`}
+                            className="font-medium text-blue-700 hover:underline"
+                          >
+                            {team.name}
+                          </Link>
                           <span className="text-xs text-gray-500 uppercase tracking-wide">
                             {team.team_size}p team
                           </span>

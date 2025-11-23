@@ -6,10 +6,40 @@ import {
   addTeamMember,
   listMemberCandidates,
   TeamRole,
+  getEventTeamDetail,
+  listTeamGames,
 } from './team.service';
 import { authRequired, AuthenticatedRequest } from '../../middleware/authMiddleware';
 
 const router = Router();
+
+// GET /api/event-teams/:id
+router.get('/:id', async (req: Request, res: Response) => {
+  const eventTeamId = Number(req.params.id);
+
+  if (Number.isNaN(eventTeamId)) {
+    res.status(400).json({ error: 'Invalid event team id' });
+    return;
+  }
+
+  try {
+    const team = await getEventTeamDetail(eventTeamId);
+    if (!team) {
+      res.status(404).json({ error: 'Team not found' });
+      return;
+    }
+
+    const [members, games] = await Promise.all([
+      listTeamMembers(eventTeamId),
+      listTeamGames(eventTeamId),
+    ]);
+
+    res.json({ team, members, games });
+  } catch (err) {
+    console.error('Error fetching team detail:', err);
+    res.status(500).json({ error: 'Failed to fetch team detail' });
+  }
+});
 
 // GET /api/event-teams/:id/members
 router.get('/:id/members', async (req: Request, res: Response) => {
