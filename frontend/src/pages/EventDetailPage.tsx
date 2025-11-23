@@ -1,6 +1,8 @@
 import { useParams } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { NotFoundPage } from './NotFoundPage';
 import { useEventDetail } from '../hooks/useEventDetail';
+import { useEventTeams } from '../hooks/useEventTeams';
 
 export function EventDetailPage() {
   const { slug, teamSize } = useParams<{ slug: string; teamSize?: string }>();
@@ -12,6 +14,7 @@ export function EventDetailPage() {
   })();
 
   const { event, loading, error, notFound } = useEventDetail(slug);
+  const { teams, loading: teamsLoading, error: teamsError } = useEventTeams(slug);
   if (notFound) {
     return <NotFoundPage />;
   }
@@ -82,6 +85,64 @@ export function EventDetailPage() {
         <p className="text-sm text-gray-500">
           Game templates, teams, and results summary will appear here later.
         </p>
+      </section>
+
+      <section className="mt-6 border-t pt-4 space-y-3">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-sm text-gray-700 font-medium">Player count:</span>
+          {[2, 3, 4, 5, 6].map((size) => {
+            const isActive = parsedTeamSize === size;
+            const target =
+              size === 3 ? `/events/${event.slug}` : `/events/${event.slug}/${size}`;
+
+            return (
+              <Link
+                key={size}
+                to={target}
+                className={`px-3 py-1 rounded-full border text-sm ${
+                  isActive
+                    ? 'bg-blue-600 text-white border-blue-600'
+                    : 'bg-white text-blue-700 border-blue-300 hover:bg-blue-50'
+                }`}
+              >
+                {size}p{size === 3 ? ' (default)' : ''}
+              </Link>
+            );
+          })}
+        </div>
+
+        <div>
+          <h2 className="text-xl font-semibold mb-2">Teams ({parsedTeamSize} players)</h2>
+
+          {teamsLoading && <p>Loading teams...</p>}
+          {teamsError && <p className="text-red-600">{teamsError}</p>}
+
+          {!teamsLoading && !teamsError && (
+            <>
+              {teams.filter((t) => t.team_size === parsedTeamSize).length === 0 ? (
+                <p className="text-gray-600">No teams found for this player count yet.</p>
+              ) : (
+                <ul className="space-y-2">
+                  {teams
+                    .filter((t) => t.team_size === parsedTeamSize)
+                    .map((team) => (
+                      <li
+                        key={team.id}
+                        className="border rounded-md px-3 py-2 bg-white/70 backdrop-blur-sm"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium text-gray-900">{team.name}</span>
+                          <span className="text-xs text-gray-500 uppercase tracking-wide">
+                            {team.team_size}p team
+                          </span>
+                        </div>
+                      </li>
+                    ))}
+                </ul>
+              )}
+            </>
+          )}
+        </div>
       </section>
     </main>
   );
