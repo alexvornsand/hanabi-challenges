@@ -9,6 +9,8 @@ export type TeamMember = {
   is_listed: boolean;
   created_at: string;
   display_name: string;
+  color_hex: string;
+  text_color: string;
 };
 
 export type TeamGame = {
@@ -26,7 +28,11 @@ export type TeamGame = {
   stage_type: 'SINGLE' | 'ROUND_ROBIN' | 'BRACKET' | 'GAUNTLET';
   template_index: number;
   variant: string;
-  players: string[];
+  players: {
+    display_name: string;
+    color_hex: string;
+    text_color: string;
+  }[];
 };
 
 export type TeamDetail = {

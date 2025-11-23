@@ -16,15 +16,15 @@ RESTART IDENTITY CASCADE;
 -- ================================
 -- Users
 -- ================================
-INSERT INTO users (display_name, password_hash, role)
+INSERT INTO users (display_name, password_hash, role, color_hex, text_color)
 VALUES
-  ('alice',  '$2b$12$ESRguBtodUUh8caZ2h0ba.BfGtRIY97/se6mLMoSp26Qhup3BBdCW', 'SUPERADMIN'),
-  ('bob',    '$2b$12$y09lDIccPbJMERu9hYvm0O9hG.7WWpL9I8rZwEScZPB.EbN5gIcNS', 'ADMIN'),
-  ('cathy',  '$2b$12$QeXC4Lo4/g2mT49hKchvBOuFCYJjnHp/FL/PUGatSQBt0zNerbxJu', 'ADMIN'),
-  ('donald', '$2b$12$zbwxFDvtarIc.IsvOWGziOisfCLNdVLqRwY0CaCDfVSqCeXcXlkL6', 'USER'),
-  ('emily',  '$2b$12$Uz8Qu8zOkvEONJiAU4RtxeUukbx3GALrB9WqYsrZwnPo2W.XsjQSG', 'USER'),
-  ('frank',  '$2b$12$.JL5jF3Vo1SCMRlyIhxjweY1FSqqRdoIY6rGGjAY43PQuZqwEr37e', 'USER'),
-  ('grace',  '$2b$12$ZyHsfOg8mzQPvLMiLmWzveooadNZKx/MIstl0LS1p1wn5YNYWIQ1O', 'USER');
+  ('alice',  '$2b$12$ESRguBtodUUh8caZ2h0ba.BfGtRIY97/se6mLMoSp26Qhup3BBdCW', 'SUPERADMIN', '#7aa6ff', '#000000'),
+  ('bob',    '$2b$12$y09lDIccPbJMERu9hYvm0O9hG.7WWpL9I8rZwEScZPB.EbN5gIcNS', 'ADMIN', '#f6a5c0', '#000000'),
+  ('cathy',  '$2b$12$QeXC4Lo4/g2mT49hKchvBOuFCYJjnHp/FL/PUGatSQBt0zNerbxJu', 'ADMIN', '#5fd0b8', '#000000'),
+  ('donald', '$2b$12$zbwxFDvtarIc.IsvOWGziOisfCLNdVLqRwY0CaCDfVSqCeXcXlkL6', 'USER', '#ffcc80', '#000000'),
+  ('emily',  '$2b$12$Uz8Qu8zOkvEONJiAU4RtxeUukbx3GALrB9WqYsrZwnPo2W.XsjQSG', 'USER', '#b388ff', '#ffffff'),
+  ('frank',  '$2b$12$.JL5jF3Vo1SCMRlyIhxjweY1FSqqRdoIY6rGGjAY43PQuZqwEr37e', 'USER', '#90caf9', '#000000'),
+  ('grace',  '$2b$12$ZyHsfOg8mzQPvLMiLmWzveooadNZKx/MIstl0LS1p1wn5YNYWIQ1O', 'USER', '#ffab91', '#000000');
 
 -- IDs:
 -- 1 = alice, 2 = bob, 3 = cathy, 4 = donald, 5 = emily, 6 = frank, 7 = grace

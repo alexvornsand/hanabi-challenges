@@ -1,17 +1,22 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ApiError, getJson } from '../lib/api';
+import { UserPill } from '../components/UserPill';
+import { useAuth } from '../context/AuthContext';
 
 type UserProfile = {
   id: number;
   display_name: string;
   role: string;
+  color_hex: string;
+  text_color: string;
   created_at: string;
 };
 
 export function UserProfilePage() {
   const { username } = useParams<{ username: string }>();
   const navigate = useNavigate();
+  const { user: authUser, logout } = useAuth();
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -63,27 +68,44 @@ export function UserProfilePage() {
     );
   }
 
-  if (error || !user) {
-    return (
-      <main className="p-4 space-y-2">
-        <p className="text-red-600">{error ?? 'User not found'}</p>
-        <button
-          onClick={() => navigate('/')}
-          className="px-3 py-2 rounded bg-blue-600 text-white font-semibold"
-        >
-          Go home
-        </button>
-      </main>
-    );
-  }
-
   return (
     <main className="p-4 space-y-3">
-      <h1 className="text-2xl font-bold">{user.display_name}</h1>
-      <p className="text-gray-700">Role: {user.role}</p>
-      <p className="text-gray-600 text-sm">
-        Joined: {new Date(user.created_at).toLocaleString()}
-      </p>
+      {error || !user ? (
+        <div className="space-y-2">
+          <p className="text-red-600">{error ?? 'User not found'}</p>
+          <button
+            onClick={() => navigate('/')}
+            className="px-3 py-2 rounded bg-blue-600 text-white font-semibold"
+          >
+            Go home
+          </button>
+        </div>
+      ) : (
+        <>
+          <UserPill
+            name={user.display_name}
+            color={user.color_hex}
+            textColor={user.text_color}
+            className="text-base"
+          />
+          <p className="text-gray-700">Role: {user.role}</p>
+          <p className="text-gray-600 text-sm">
+            Joined: {new Date(user.created_at).toLocaleString()}
+          </p>
+        </>
+      )}
+
+      {authUser && (
+        <button
+          onClick={() => {
+            logout();
+            navigate('/login');
+          }}
+          className="px-3 py-2 rounded bg-red-600 text-white font-semibold"
+        >
+          Log out
+        </button>
+      )}
     </main>
   );
 }

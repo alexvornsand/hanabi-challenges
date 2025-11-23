@@ -1,7 +1,7 @@
 // src/modules/auth/auth.routes.ts
 import { Router, type Request, type Response } from 'express';
 import { authRequired, AuthenticatedRequest } from '../../middleware/authMiddleware';
-import { loginOrCreateUser } from './auth.service';
+import { loginOrCreateUser, pickTextColor, randomHexColor } from './auth.service';
 import { pool } from '../../config/db';
 
 const router = Router();
@@ -46,7 +46,7 @@ router.get('/users/:display_name', async (req: Request, res: Response) => {
   try {
     const result = await pool.query(
       `
-      SELECT id, display_name, role, created_at
+      SELECT id, display_name, role, color_hex, text_color, created_at
       FROM users
       WHERE display_name = $1;
       `,
@@ -57,7 +57,27 @@ router.get('/users/:display_name', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    res.json(result.rows[0]);
+    const row = result.rows[0];
+    const color = row.color_hex ?? randomHexColor();
+    const textColor = row.text_color ?? pickTextColor(color);
+
+    // Backfill if missing
+    if (!row.color_hex || !row.text_color) {
+      await pool.query(
+        `
+        UPDATE users
+        SET color_hex = $1, text_color = $2
+        WHERE id = $3;
+        `,
+        [color, textColor, row.id],
+      );
+    }
+
+    res.json({
+      ...row,
+      color_hex: color,
+      text_color: textColor,
+    });
   } catch (err) {
     console.error('Error fetching user by display_name:', err);
     res.status(500).json({ error: 'Failed to fetch user' });

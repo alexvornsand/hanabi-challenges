@@ -24,6 +24,8 @@ export interface TeamMember {
   is_listed: boolean;
   created_at: string;
   display_name: string;
+  color_hex: string;
+  text_color: string;
 }
 
 export interface MemberCandidate {
@@ -46,7 +48,11 @@ export interface TeamGameSummary {
   stage_type: 'SINGLE' | 'ROUND_ROBIN' | 'BRACKET' | 'GAUNTLET';
   template_index: number;
   variant: string;
-  players: string[];
+  players: {
+    display_name: string;
+    color_hex: string;
+    text_color: string;
+  }[];
 }
 
 // List members of a team
@@ -60,7 +66,9 @@ export async function listTeamMembers(eventTeamId: number): Promise<TeamMember[]
       tm.role,
       tm.is_listed,
       tm.created_at,
-      u.display_name
+      u.display_name,
+      u.color_hex,
+      u.text_color
     FROM team_memberships tm
     JOIN users u ON tm.user_id = u.id
     WHERE tm.event_team_id = $1
@@ -294,7 +302,17 @@ export async function listTeamGames(eventTeamId: number): Promise<TeamGameSummar
       es.stage_type,
       egt.template_index,
       egt.variant,
-      array_remove(array_agg(u.display_name ORDER BY u.display_name), NULL) AS players
+      COALESCE(
+        json_agg(
+          json_build_object(
+            'display_name', u.display_name,
+            'color_hex', u.color_hex,
+            'text_color', u.text_color
+          )
+          ORDER BY u.display_name
+        ) FILTER (WHERE u.id IS NOT NULL),
+        '[]'::json
+      ) AS players
     FROM event_games g
     JOIN event_game_templates egt ON egt.id = g.event_game_template_id
     JOIN event_stages es ON es.event_stage_id = egt.event_stage_id
@@ -322,16 +340,6 @@ export async function listTeamGames(eventTeamId: number): Promise<TeamGameSummar
   );
 
   return result.rows.map((row) => {
-    let players: string[] = [];
-    if (Array.isArray(row.players)) {
-      players = row.players;
-    } else if (typeof row.players === 'string') {
-      players = row.players
-        .replace(/^\{|\}$/g, '')
-        .split(',')
-        .filter((p: string) => p.length > 0);
-    }
-
-    return { ...row, players } as TeamGameSummary;
+    return { ...row, players: row.players ?? [] } as TeamGameSummary;
   });
 }

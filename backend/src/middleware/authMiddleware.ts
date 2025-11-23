@@ -8,6 +8,8 @@ export interface AuthPayload {
   userId: number;
   displayName: string;
   role: UserRole;
+  color_hex: string;
+  text_color: string;
   iat: number;
   exp: number;
 }

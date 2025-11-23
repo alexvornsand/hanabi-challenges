@@ -14,7 +14,15 @@ export const MainLayout: React.FC = () => {
             <Link to="/statistics">Statistics</Link>
           </div>
           {user ? (
-            <Link to="/me" className="main-nav__login-btn">
+            <Link
+              to="/me"
+              className="main-nav__login-btn main-nav__login-btn--user"
+              style={{
+                backgroundColor: user.color_hex || '#777777',
+                color: user.text_color || '#ffffff',
+                borderColor: user.color_hex || '#777777',
+              }}
+            >
               {user.display_name}
             </Link>
           ) : (

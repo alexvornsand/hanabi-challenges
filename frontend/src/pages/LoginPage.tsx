@@ -11,6 +11,8 @@ type LoginResponse = {
     display_name: string;
     role: string;
     created_at: string;
+    color_hex: string;
+    text_color: string;
   };
   token: string;
 };

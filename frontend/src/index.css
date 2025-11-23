@@ -74,11 +74,23 @@ button:focus-visible {
   border-radius: 999px;
   color: #646cff;
   font-weight: 600;
+  background-color: transparent;
 }
 
 .main-nav__login-btn:hover {
   color: #535bf2;
   border-color: #535bf2;
+}
+
+.main-nav__login-btn--user {
+  border-radius: 12px;
+  font-weight: 700;
+}
+
+.user-pill {
+  border-radius: 12px;
+  padding: 0.35rem 0.65rem;
+  line-height: 1.1;
 }
 
 @media (prefers-color-scheme: light) {

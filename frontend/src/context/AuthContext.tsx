@@ -4,6 +4,8 @@ type AuthUser = {
   id: number;
   display_name: string;
   role: string;
+  color_hex: string;
+  text_color: string;
 };
 
 type AuthState = {
@@ -28,7 +30,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!raw) return { user: null, token: null };
       const parsed = JSON.parse(raw) as AuthState;
       return {
-        user: parsed.user ?? null,
+        user: parsed.user
+          ? {
+              ...parsed.user,
+              color_hex: parsed.user.color_hex || '#777777',
+              text_color: parsed.user.text_color || '#ffffff',
+            }
+          : null,
         token: parsed.token ?? cookieToken ?? null,
       };
     } catch {
@@ -51,7 +59,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value = useMemo<AuthContextValue>(
     () => ({
       ...state,
-      login: (user, token) => setState({ user, token }),
+      login: (user, token) =>
+        setState({
+          user: {
+            ...user,
+            color_hex: user.color_hex || '#777777',
+            text_color: user.text_color || '#ffffff',
+          },
+          token,
+        }),
       logout: () => setState({ user: null, token: null }),
     }),
     [state],

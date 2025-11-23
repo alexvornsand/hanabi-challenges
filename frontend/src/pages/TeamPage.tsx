@@ -1,6 +1,7 @@
 import { Link, useParams } from 'react-router-dom';
 import { NotFoundPage } from './NotFoundPage';
 import { useTeamDetail, type TeamGame } from '../hooks/useTeamDetail';
+import { UserPill } from '../components/UserPill';
 
 export function TeamPage() {
   const { slug, teamId } = useParams<{ slug: string; teamId: string }>();
@@ -95,7 +96,11 @@ export function TeamPage() {
                 key={member.id}
                 className="border rounded-md px-3 py-2 bg-white/70 backdrop-blur-sm flex items-center justify-between"
               >
-                <span className="font-medium text-gray-900">{member.display_name}</span>
+                <UserPill
+                  name={member.display_name}
+                  color={member.color_hex}
+                  textColor={member.text_color}
+                />
                 <span className="text-xs uppercase tracking-wide text-gray-600">{member.role}</span>
               </li>
             ))}
@@ -141,9 +146,17 @@ export function TeamPage() {
                               Played: {new Date(game.played_at).toLocaleString()}
                             </p>
                             {game.players.length > 0 && (
-                              <p className="text-sm text-gray-600">
-                                Players: {game.players.join(', ')}
-                              </p>
+                              <div className="flex flex-wrap gap-1 items-center text-sm text-gray-600">
+                                <span>Players:</span>
+                                {game.players.map((p) => (
+                                  <UserPill
+                                    key={p.display_name}
+                                    name={p.display_name}
+                                    color={p.color_hex}
+                                    textColor={p.text_color}
+                                  />
+                                ))}
+                              </div>
                             )}
                             {game.notes && <p className="text-sm text-gray-700">Notes: {game.notes}</p>}
                           </div>

@@ -21,6 +21,9 @@ CREATE TABLE users (
   password_hash TEXT NOT NULL,
   role TEXT NOT NULL DEFAULT 'USER'
     CHECK (role IN ('SUPERADMIN', 'ADMIN', 'USER')),
+  color_hex TEXT NOT NULL DEFAULT '#777777',
+  text_color TEXT NOT NULL DEFAULT '#ffffff'
+    CHECK (text_color IN ('#000000', '#ffffff')),
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
