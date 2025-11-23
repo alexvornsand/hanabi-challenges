@@ -1,11 +1,14 @@
 // src/routes/AppRoutes.tsx
-import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { MainLayout } from '../layouts/MainLayout';
 import { LandingPage } from '../pages/LandingPage';
 import { EventArchivePage } from '../pages/EventArchivePage';
 import { EventDetailPage } from '../pages/EventDetailPage';
 import { TeamPage } from '../pages/TeamPage';
+import { LoginPage } from '../pages/LoginPage';
+import { UserPage } from '../pages/UserPage';
+import { UserProfilePage } from '../pages/UserProfilePage';
+import { NewUserPage } from '../pages/NewUserPage';
 import { NotFoundPage } from '../pages/NotFoundPage';
 
 export function AppRoutes() {
@@ -23,6 +26,12 @@ export function AppRoutes() {
             <Route path=":slug/:teamSize" element={<EventDetailPage />} />
             <Route path=":slug/teams/:teamId" element={<TeamPage />} />
           </Route>
+
+          {/* Auth */}
+          <Route path="login" element={<LoginPage />} />
+          <Route path="new-user" element={<NewUserPage />} />
+          <Route path="me" element={<UserPage />} />
+          <Route path="users/:username" element={<UserProfilePage />} />
 
           {/* Catch-all */}
           <Route path="*" element={<NotFoundPage />} />

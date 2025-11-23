@@ -1,13 +1,27 @@
 import React from 'react';
 import { Outlet, Link } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 export const MainLayout: React.FC = () => {
+  const { user } = useAuth();
+
   return (
     <div className="app-root">
       <header>
-        <nav>
-          <Link to="/">Hanabi Events</Link> | <Link to="/events">Events</Link> |{' '}
-          <Link to="/statistics">Statistics</Link> | <Link to="/login">Log in</Link>
+        <nav className="main-nav">
+          <div className="main-nav__links">
+            <Link to="/">Hanabi Events</Link> | <Link to="/events">Events</Link> |{' '}
+            <Link to="/statistics">Statistics</Link>
+          </div>
+          {user ? (
+            <Link to="/me" className="main-nav__login-btn">
+              {user.display_name}
+            </Link>
+          ) : (
+            <Link to="/login" className="main-nav__login-btn">
+              Log in
+            </Link>
+          )}
         </nav>
       </header>
 

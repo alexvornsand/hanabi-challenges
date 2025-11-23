@@ -26,12 +26,13 @@ export function useEventTeams(slug: string | undefined) {
     if (!slug) return;
 
     let cancelled = false;
+    const currentSlug = slug; // narrow for TS
 
     async function fetchTeams() {
       setState({ teams: [], loading: true, error: null });
 
       try {
-        const encodedSlug = encodeURIComponent(slug);
+        const encodedSlug = encodeURIComponent(currentSlug);
         const data = await getJson<EventTeam[]>(`/events/${encodedSlug}/teams`);
 
         if (!cancelled) {

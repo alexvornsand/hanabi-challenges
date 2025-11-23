@@ -2,6 +2,7 @@
 import { Router, type Request, type Response } from 'express';
 import { authRequired, AuthenticatedRequest } from '../../middleware/authMiddleware';
 import { loginOrCreateUser } from './auth.service';
+import { pool } from '../../config/db';
 
 const router = Router();
 
@@ -36,6 +37,31 @@ router.get('/me', authRequired, (req: AuthenticatedRequest, res: Response) => {
     message: 'Token is valid',
     user: req.user,
   });
+});
+
+// GET /api/users/:display_name
+router.get('/users/:display_name', async (req: Request, res: Response) => {
+  const { display_name } = req.params;
+
+  try {
+    const result = await pool.query(
+      `
+      SELECT id, display_name, role, created_at
+      FROM users
+      WHERE display_name = $1;
+      `,
+      [display_name],
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Error fetching user by display_name:', err);
+    res.status(500).json({ error: 'Failed to fetch user' });
+  }
 });
 
 export default router;

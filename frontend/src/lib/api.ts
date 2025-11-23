@@ -13,12 +13,7 @@ export class ApiError extends Error {
 }
 
 export async function getJson<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    ...init,
-  });
+  const res = await fetch(`${API_BASE}${path}`, withJsonHeaders(init));
 
   let body: unknown = null;
   try {
@@ -34,4 +29,37 @@ export async function getJson<T>(path: string, init?: RequestInit): Promise<T> {
   // If JSON parsing failed above, body will be null and this will throw,
   // but for our use case we expect JSON from the API.
   return body as T;
+}
+
+export async function getJsonAuth<T>(path: string, token: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    ...withJsonHeaders(init),
+    headers: {
+      ...withJsonHeaders(init).headers,
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  let body: unknown = null;
+  try {
+    body = await res.json();
+  } catch {
+    // ignore JSON parse errors; body stays null
+  }
+
+  if (!res.ok) {
+    throw new ApiError(`Request failed with status ${res.status}`, res.status, body);
+  }
+
+  return body as T;
+}
+
+function withJsonHeaders(init?: RequestInit): RequestInit {
+  return {
+    headers: {
+      'Content-Type': 'application/json',
+      ...(init?.headers ?? {}),
+    },
+    ...init,
+  };
 }

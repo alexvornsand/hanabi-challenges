@@ -1,6 +1,6 @@
 import { Link, useParams } from 'react-router-dom';
 import { NotFoundPage } from './NotFoundPage';
-import { useTeamDetail, TeamGame } from '../hooks/useTeamDetail';
+import { useTeamDetail, type TeamGame } from '../hooks/useTeamDetail';
 
 export function TeamPage() {
   const { slug, teamId } = useParams<{ slug: string; teamId: string }>();
