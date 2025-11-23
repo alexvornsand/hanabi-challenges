@@ -2,6 +2,7 @@ BEGIN;
 
 -- Wipe existing data (and reset sequences)
 TRUNCATE TABLE
+  pending_team_members,
   event_stage_team_statuses,
   game_participants,
   event_games,

@@ -1,6 +1,7 @@
 -- Enable extensions
 CREATE EXTENSION IF NOT EXISTS citext;
 
+DROP TABLE IF EXISTS pending_team_members CASCADE;
 DROP TABLE IF EXISTS event_stage_team_statuses CASCADE;
 DROP TABLE IF EXISTS game_participants CASCADE;
 DROP TABLE IF EXISTS event_games CASCADE;
@@ -67,6 +68,17 @@ CREATE TABLE team_memberships (
   is_listed BOOLEAN NOT NULL DEFAULT TRUE,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE (event_team_id, user_id, role)
+);
+
+------------------------------------------------------------
+-- PENDING TEAM MEMBERS (not yet linked to a user)
+------------------------------------------------------------
+CREATE TABLE pending_team_members (
+  id SERIAL PRIMARY KEY,
+  event_team_id INTEGER NOT NULL REFERENCES event_teams(id) ON DELETE CASCADE,
+  display_name TEXT NOT NULL,
+  role TEXT NOT NULL CHECK (role IN ('PLAYER', 'STAFF')),
+  created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 ------------------------------------------------------------

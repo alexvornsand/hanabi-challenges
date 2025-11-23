@@ -101,7 +101,6 @@ export function TeamPage() {
                   color={member.color_hex}
                   textColor={member.text_color}
                 />
-                <span className="text-xs uppercase tracking-wide text-gray-600">{member.role}</span>
               </li>
             ))}
           </ul>

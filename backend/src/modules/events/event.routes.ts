@@ -1,6 +1,6 @@
 // src/modules/events/event.routes.ts
 import { Router, Request, Response } from 'express';
-import { authRequired, requireAdmin } from '../../middleware/authMiddleware';
+import { authRequired, requireAdmin, AuthenticatedRequest } from '../../middleware/authMiddleware';
 import {
   listEvents,
   createEvent,
@@ -35,6 +35,194 @@ router.get('/', async (_req: Request, res: Response) => {
   } catch (err) {
     console.error('Error fetching events:', err);
     res.status(500).json({ error: 'Failed to fetch events' });
+  }
+});
+
+/* ------------------------------------------
+ *  GET /api/events/:slug/memberships
+ *  List user memberships for this event (for client-side validation)
+ * ----------------------------------------*/
+router.get('/:slug/memberships', async (req: Request, res: Response) => {
+  const { slug } = req.params;
+
+  try {
+    const eventId = await getEventId(slug);
+    if (!eventId) return res.status(404).json({ error: 'Event not found' });
+
+    const result = await pool.query(
+      `
+      SELECT
+        tm.user_id,
+        u.display_name,
+        et.team_size,
+        et.id AS event_team_id
+      FROM team_memberships tm
+      JOIN event_teams et ON et.id = tm.event_team_id
+      JOIN users u ON u.id = tm.user_id
+      WHERE et.event_id = $1;
+      `,
+      [eventId],
+    );
+
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Error fetching event memberships:', err);
+    res.status(500).json({ error: 'Failed to fetch memberships' });
+  }
+});
+
+/* ------------------------------------------
+ *  POST /api/events/:slug/register
+ *  Create a team and add members (existing or pending)
+ * ----------------------------------------*/
+router.post('/:slug/register', authRequired, async (req: AuthenticatedRequest, res: Response) => {
+  const { slug } = req.params;
+  const { team_name, team_size, members } = req.body;
+  const currentUserId = req.user?.userId;
+
+  if (!team_name || team_size == null || !Array.isArray(members)) {
+    return res.status(400).json({ error: 'team_name, team_size, and members are required' });
+  }
+
+  const sizeNum = Number(team_size);
+  if (!Number.isInteger(sizeNum) || sizeNum < 2 || sizeNum > 6) {
+    return res.status(400).json({ error: 'team_size must be an integer between 2 and 6' });
+  }
+
+  if (!currentUserId) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+
+  const memberEntries = members as Array<{
+    user_id?: number;
+    display_name?: string;
+    role?: 'PLAYER' | 'STAFF';
+  }>;
+
+  if (memberEntries.length === 0) {
+    return res.status(400).json({ error: 'At least one member is required' });
+  }
+
+  // Ensure current user is included
+  const includesCurrentUser = memberEntries.some(
+    (m) => m.user_id && Number(m.user_id) === currentUserId,
+  );
+  if (!includesCurrentUser) {
+    return res.status(400).json({ error: 'Current user must be part of the team' });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const eventResult = await client.query<{ id: number }>(
+      `SELECT id FROM events WHERE slug = $1`,
+      [slug],
+    );
+    if (eventResult.rowCount === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Event not found' });
+    }
+    const eventId = eventResult.rows[0].id;
+
+    // Check if any member already has a team in this event with the same size
+    const memberUserIds = memberEntries.map((m) => m.user_id).filter((id) => id != null) as number[];
+    if (memberUserIds.length > 0) {
+      const conflictCheck = await client.query(
+        `
+        SELECT DISTINCT u.display_name
+        FROM team_memberships tm
+        JOIN event_teams et ON et.id = tm.event_team_id
+        JOIN users u ON u.id = tm.user_id
+        WHERE et.event_id = $1
+          AND et.team_size = $2
+          AND tm.user_id = ANY($3::int[])
+        `,
+        [eventId, sizeNum, memberUserIds],
+      );
+      if (conflictCheck.rowCount > 0) {
+        await client.query('ROLLBACK');
+        return res.status(409).json({
+          error: `These users already have a ${sizeNum}p team for this event: ${conflictCheck
+            .rows.map((r) => r.display_name)
+            .join(', ')}`,
+        });
+      }
+    }
+
+    const teamResult = await client.query(
+      `
+      INSERT INTO event_teams (event_id, name, team_size)
+      VALUES ($1, $2, $3)
+      RETURNING id, event_id, name, team_size, created_at;
+      `,
+      [eventId, team_name, sizeNum],
+    );
+    const team = teamResult.rows[0];
+
+    const addedMembers: unknown[] = [];
+    const pendingMembers: unknown[] = [];
+
+    for (const m of memberEntries) {
+      const role = m.role === 'STAFF' ? 'STAFF' : 'PLAYER';
+      if (m.user_id) {
+        const memberResult = await client.query(
+          `
+          INSERT INTO team_memberships (event_team_id, user_id, role, is_listed)
+          VALUES ($1, $2, $3, true)
+          RETURNING id, event_team_id, user_id, role, is_listed, created_at;
+          `,
+          [team.id, Number(m.user_id), role],
+        );
+        const memberRow = memberResult.rows[0];
+
+        // Fetch display name and colors
+        const userResult = await client.query(
+          `
+          SELECT display_name, color_hex, text_color
+          FROM users
+          WHERE id = $1;
+          `,
+          [memberRow.user_id],
+        );
+        const userInfo = userResult.rows[0] ?? {
+          display_name: 'Unknown',
+          color_hex: '#777777',
+          text_color: '#ffffff',
+        };
+
+        addedMembers.push({ ...memberRow, ...userInfo });
+      } else if (m.display_name) {
+        const pendingResult = await client.query(
+          `
+          INSERT INTO pending_team_members (event_team_id, display_name, role)
+          VALUES ($1, $2, $3)
+          RETURNING id, event_team_id, display_name, role, created_at;
+          `,
+          [team.id, m.display_name, role],
+        );
+        pendingMembers.push(pendingResult.rows[0]);
+      }
+    }
+
+    await client.query('COMMIT');
+
+    res.status(201).json({
+      team,
+      members: addedMembers,
+      pending: pendingMembers,
+    });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    const e = err as { code?: string };
+    if (e.code === '23505') {
+      return res.status(409).json({ error: 'Duplicate team or member detected' });
+    }
+
+    console.error('Error registering team:', err);
+    res.status(500).json({ error: 'Failed to register team' });
+  } finally {
+    client.release();
   }
 });
 

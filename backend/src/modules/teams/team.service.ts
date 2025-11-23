@@ -28,6 +28,14 @@ export interface TeamMember {
   text_color: string;
 }
 
+export interface PendingTeamMember {
+  id: number;
+  event_team_id: number;
+  display_name: string;
+  role: TeamRole;
+  created_at: string;
+}
+
 export interface MemberCandidate {
   id: number;
   display_name: string;
@@ -206,6 +214,25 @@ export async function addTeamMember(input: {
 
     throw err;
   }
+}
+
+export async function addPendingTeamMember(input: {
+  event_team_id: number;
+  display_name: string;
+  role: TeamRole;
+}): Promise<PendingTeamMember> {
+  const { event_team_id, display_name, role } = input;
+
+  const result = await pool.query(
+    `
+    INSERT INTO pending_team_members (event_team_id, display_name, role)
+    VALUES ($1, $2, $3)
+    RETURNING id, event_team_id, display_name, role, created_at;
+    `,
+    [event_team_id, display_name, role],
+  );
+
+  return result.rows[0];
 }
 
 // List candidate members for a team (users not yet on team, optional prefix filter)

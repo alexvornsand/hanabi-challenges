@@ -54,6 +54,36 @@ export async function getJsonAuth<T>(path: string, token: string, init?: Request
   return body as T;
 }
 
+export async function postJsonAuth<T>(
+  path: string,
+  token: string,
+  body: unknown,
+  init?: RequestInit,
+): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: 'POST',
+    ...withJsonHeaders(init),
+    headers: {
+      ...withJsonHeaders(init).headers,
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(body),
+  });
+
+  let parsed: unknown = null;
+  try {
+    parsed = await res.json();
+  } catch {
+    // ignore
+  }
+
+  if (!res.ok) {
+    throw new ApiError(`Request failed with status ${res.status}`, res.status, parsed);
+  }
+
+  return parsed as T;
+}
+
 function withJsonHeaders(init?: RequestInit): RequestInit {
   return {
     headers: {

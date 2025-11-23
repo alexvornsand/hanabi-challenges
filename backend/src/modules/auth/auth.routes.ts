@@ -117,4 +117,21 @@ router.get('/users/:display_name/events', async (req: Request, res: Response) =>
   }
 });
 
+// GET /api/users (for autocomplete)
+router.get('/users', async (_req: Request, res: Response) => {
+  try {
+    const result = await pool.query(
+      `
+      SELECT id, display_name, color_hex, text_color
+      FROM users
+      ORDER BY display_name;
+      `,
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Error fetching users:', err);
+    res.status(500).json({ error: 'Failed to fetch users' });
+  }
+});
+
 export default router;

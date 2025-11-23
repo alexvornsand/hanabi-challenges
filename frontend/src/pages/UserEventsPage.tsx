@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { UserPill } from '../components/UserPill';
 import { useAuth } from '../context/AuthContext';
 import { ApiError, getJson } from '../lib/api';
@@ -18,7 +18,6 @@ type UserEvent = {
 export function UserEventsPage() {
   const { username } = useParams<{ username: string }>();
   const { user } = useAuth();
-  const navigate = useNavigate();
   const displayName = username ?? 'Unknown';
   const pillColor = user && user.display_name === username ? user.color_hex : '#777777';
   const pillText = user && user.display_name === username ? user.text_color : '#ffffff';
