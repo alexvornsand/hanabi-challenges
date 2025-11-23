@@ -20,21 +20,26 @@ type State = {
 };
 
 export function useChallengeDetail(slug: string | undefined) {
-  const [state, setState] = useState<State>({
-    challenge: null,
-    loading: true,
-    error: null,
-    notFound: false,
-  });
+  const [state, setState] = useState<State>(() =>
+    !slug
+      ? {
+          challenge: null,
+          loading: false,
+          error: 'No challenge specified',
+          notFound: false,
+        }
+      : {
+          challenge: null,
+          loading: true,
+          error: null,
+          notFound: false,
+        }
+  );
 
   useEffect(() => {
+    // If there's no slug, we don't run the effect at all.
+    // The "no challenge specified" state is handled in the initializer above.
     if (!slug) {
-      setState({
-        challenge: null,
-        loading: false,
-        error: 'No challenge specified',
-        notFound: false,
-      });
       return;
     }
 
@@ -50,7 +55,8 @@ export function useChallengeDetail(slug: string | undefined) {
 
       try {
         // getJson will add /api → /api/challenges/:slug
-        const data = await getJson<ChallengeDetail>(`/challenges/${encodeURIComponent(slug)}`);
+        const encodedSlug = encodeURIComponent(slug as string);
+        const data = await getJson<ChallengeDetail>(`/challenges/${encodedSlug}`);
 
         if (!cancelled) {
           setState({
