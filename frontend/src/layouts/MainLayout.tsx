@@ -10,7 +10,7 @@ export const MainLayout: React.FC = () => {
       <header>
         <nav className="main-nav">
           <div className="main-nav__links">
-            <Link to="/">Hanabi Events</Link> | <Link to="/events">Events</Link> |{' '}
+            <Link to="/">Home</Link> | <Link to="/events">Events</Link> |{' '}
             <Link to="/statistics">Statistics</Link>
             {user && (user.role === 'ADMIN' || user.role === 'SUPERADMIN') && (
               <>

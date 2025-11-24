@@ -479,6 +479,16 @@ router.post('/', authRequired, requireAdmin, async (req: Request, res: Response)
   if (!name) return res.status(400).json({ error: 'name is required' });
   if (!slug) return res.status(400).json({ error: 'slug is required' });
   if (!long_description) return res.status(400).json({ error: 'long_description is required' });
+  if (starts_at && ends_at) {
+    const startDate = new Date(starts_at);
+    const endDate = new Date(ends_at);
+    if (!Number.isFinite(startDate.getTime()) || !Number.isFinite(endDate.getTime())) {
+      return res.status(400).json({ error: 'Invalid date format for starts_at or ends_at' });
+    }
+    if (endDate <= startDate) {
+      return res.status(400).json({ error: 'ends_at must be after starts_at' });
+    }
+  }
 
   try {
     const event = await createEvent({

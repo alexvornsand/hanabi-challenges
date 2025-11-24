@@ -18,11 +18,19 @@ function formatDateRange(startsAt: string | null, endsAt: string | null) {
 
 export const EventArchivePage: React.FC = () => {
   const { events, loading, error } = useEvents();
+  const sortedEvents = [...events].sort((a, b) => {
+    const aStart = a.starts_at ? new Date(a.starts_at).getTime() : -Infinity;
+    const bStart = b.starts_at ? new Date(b.starts_at).getTime() : -Infinity;
+    if (aStart !== bStart) return bStart - aStart;
+    const aEnd = a.ends_at ? new Date(a.ends_at).getTime() : -Infinity;
+    const bEnd = b.ends_at ? new Date(b.ends_at).getTime() : -Infinity;
+    return bEnd - aEnd;
+  });
 
   return (
     <main className="p-4 space-y-4">
       <header>
-        <h1 className="text-2xl font-bold">Event Archive</h1>
+        <h1 className="text-2xl font-bold">Events</h1>
         <p className="text-gray-700 mt-1">All Hanabi events, past and present.</p>
       </header>
 
@@ -37,32 +45,27 @@ export const EventArchivePage: React.FC = () => {
       {!loading && !error && events.length === 0 && <p>No events found yet.</p>}
 
       {!loading && !error && events.length > 0 && (
-        <ul className="space-y-3">
-          {events.map((event) => {
-            const description =
-              event.short_description || event.long_description || 'No description provided.';
-
+        <div className="space-y-4">
+          {sortedEvents.map((event) => {
+            const description = event.long_description || event.short_description || 'No description provided.';
             return (
-              <li
+              <div
                 key={event.id}
-                className="border rounded-md p-3 shadow-sm bg-white/60 backdrop-blur-sm"
+                className="border rounded-md p-4 shadow-sm bg-white/70 backdrop-blur-sm space-y-2"
               >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="space-y-1">
-                    <Link to={`/events/${event.slug}`} className="text-lg font-semibold text-blue-700">
-                      {event.name}
-                    </Link>
-                    <p className="text-sm text-gray-600">{description}</p>
-                    <p className="text-xs text-gray-500 uppercase tracking-wide">
-                      {formatDateRange(event.starts_at, event.ends_at)}
-                    </p>
-                  </div>
-                  <code className="text-xs text-gray-500 whitespace-nowrap">{event.slug}</code>
+                <div className="flex items-baseline gap-3">
+                  <Link to={`/events/${event.slug}`} className="text-lg font-semibold text-blue-700 flex-1">
+                    {event.name}
+                  </Link>
+                  <span className="text-sm text-gray-600 whitespace-nowrap ml-auto">
+                    {formatDateRange(event.starts_at, event.ends_at)}
+                  </span>
                 </div>
-              </li>
+                <p className="text-sm text-gray-700">{description}</p>
+              </div>
             );
           })}
-        </ul>
+        </div>
       )}
     </main>
   );
