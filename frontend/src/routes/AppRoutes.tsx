@@ -11,6 +11,9 @@ import { UserProfilePage } from '../pages/UserProfilePage';
 import { NewUserPage } from '../pages/NewUserPage';
 import { UserEventsPage } from '../pages/UserEventsPage';
 import { UserBadgesPage } from '../pages/UserBadgesPage';
+import { AdminHomePage } from '../pages/admin/AdminHomePage';
+import { AdminCreateEventPage } from '../pages/admin/AdminCreateEventPage';
+import { AdminManageUsersPage } from '../pages/admin/AdminManageUsersPage';
 import { NotFoundPage } from '../pages/NotFoundPage';
 
 export function AppRoutes() {
@@ -36,6 +39,13 @@ export function AppRoutes() {
           <Route path="users/:username" element={<UserProfilePage />} />
           <Route path="users/:username/events" element={<UserEventsPage />} />
           <Route path="users/:username/badges" element={<UserBadgesPage />} />
+
+          {/* Admin */}
+          <Route path="admin">
+            <Route index element={<AdminHomePage />} />
+            <Route path="create-event" element={<AdminCreateEventPage />} />
+            <Route path="manage-users" element={<AdminManageUsersPage />} />
+          </Route>
 
           {/* Catch-all */}
           <Route path="*" element={<NotFoundPage />} />

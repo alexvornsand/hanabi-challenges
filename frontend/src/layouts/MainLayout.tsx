@@ -12,6 +12,12 @@ export const MainLayout: React.FC = () => {
           <div className="main-nav__links">
             <Link to="/">Hanabi Events</Link> | <Link to="/events">Events</Link> |{' '}
             <Link to="/statistics">Statistics</Link>
+            {user && (user.role === 'ADMIN' || user.role === 'SUPERADMIN') && (
+              <>
+                {' '}
+                | <Link to="/admin">Admin</Link>
+              </>
+            )}
           </div>
           {user ? (
             <Link
