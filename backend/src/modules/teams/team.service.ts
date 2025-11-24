@@ -63,6 +63,25 @@ export interface TeamGameSummary {
   }[];
 }
 
+export interface TeamTemplateWithResult {
+  stage_index: number;
+  stage_label: string;
+  stage_type: EventStage['stage_type'];
+  template_id: number;
+  template_index: number;
+  variant: string;
+  seed_payload: string | null;
+  result: {
+    id: number;
+    score: number;
+    zero_reason: string | null;
+    bottom_deck_risk: number | null;
+    notes: string | null;
+    played_at: string;
+    hanab_game_id: number | null;
+  } | null;
+}
+
 // List members of a team
 export async function listTeamMembers(eventTeamId: number): Promise<TeamMember[]> {
   const result = await pool.query(
@@ -369,4 +388,56 @@ export async function listTeamGames(eventTeamId: number): Promise<TeamGameSummar
   return result.rows.map((row) => {
     return { ...row, players: row.players ?? [] } as TeamGameSummary;
   });
+}
+
+export async function listTeamTemplatesWithResults(
+  eventTeamId: number,
+): Promise<TeamTemplateWithResult[]> {
+  const result = await pool.query(
+    `
+    SELECT
+      es.stage_index,
+      es.label AS stage_label,
+      es.stage_type,
+      egt.id AS template_id,
+      egt.template_index,
+      egt.variant,
+      egt.seed_payload,
+      g.id AS result_id,
+      g.score,
+      g.zero_reason,
+      g.bottom_deck_risk,
+      g.notes,
+      g.played_at,
+      g.game_id AS hanab_game_id
+    FROM event_game_templates egt
+    JOIN event_stages es ON es.event_stage_id = egt.event_stage_id
+    JOIN event_teams t ON t.event_id = es.event_id
+    LEFT JOIN event_games g ON g.event_game_template_id = egt.id AND g.event_team_id = t.id
+    WHERE t.id = $1
+    ORDER BY es.stage_index, egt.template_index;
+    `,
+    [eventTeamId],
+  );
+
+  return result.rows.map((row) => ({
+    stage_index: row.stage_index,
+    stage_label: row.stage_label,
+    stage_type: row.stage_type,
+    template_id: row.template_id,
+    template_index: row.template_index,
+    variant: row.variant,
+    seed_payload: row.seed_payload,
+    result: row.result_id
+      ? {
+          id: row.result_id,
+          score: row.score,
+          zero_reason: row.zero_reason,
+          bottom_deck_risk: row.bottom_deck_risk,
+          notes: row.notes,
+          played_at: row.played_at,
+          hanab_game_id: row.hanab_game_id,
+        }
+      : null,
+  }));
 }

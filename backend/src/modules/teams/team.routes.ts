@@ -8,6 +8,7 @@ import {
   TeamRole,
   getEventTeamDetail,
   listTeamGames,
+  listTeamTemplatesWithResults,
 } from './team.service';
 import { authRequired, AuthenticatedRequest } from '../../middleware/authMiddleware';
 
@@ -38,6 +39,29 @@ router.get('/:id', async (req: Request, res: Response) => {
   } catch (err) {
     console.error('Error fetching team detail:', err);
     res.status(500).json({ error: 'Failed to fetch team detail' });
+  }
+});
+
+// GET /api/event-teams/:id/templates
+router.get('/:id/templates', async (req: Request, res: Response) => {
+  const eventTeamId = Number(req.params.id);
+
+  if (Number.isNaN(eventTeamId)) {
+    res.status(400).json({ error: 'Invalid event team id' });
+    return;
+  }
+
+  try {
+    const team = await getEventTeamDetail(eventTeamId);
+    if (!team) {
+      return res.status(404).json({ error: 'Team not found' });
+    }
+
+    const templates = await listTeamTemplatesWithResults(eventTeamId);
+    res.json({ team, templates });
+  } catch (err) {
+    console.error('Error fetching team templates:', err);
+    res.status(500).json({ error: 'Failed to fetch templates' });
   }
 });
 

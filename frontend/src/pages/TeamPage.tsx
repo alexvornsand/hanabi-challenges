@@ -1,7 +1,9 @@
 import { Link, useParams } from 'react-router-dom';
 import { NotFoundPage } from './NotFoundPage';
 import { useTeamDetail, type TeamGame } from '../hooks/useTeamDetail';
+import { useTeamTemplates, type TeamTemplate } from '../hooks/useTeamTemplates';
 import { UserPill } from '../components/UserPill';
+import { useState } from 'react';
 
 export function TeamPage() {
   const { slug, teamId } = useParams<{ slug: string; teamId: string }>();
@@ -12,6 +14,15 @@ export function TeamPage() {
   })();
 
   const { data, loading, error, notFound } = useTeamDetail(parsedTeamId);
+  const { templates, loading: templatesLoading, error: templatesError } = useTeamTemplates(parsedTeamId);
+  const [drafts, setDrafts] = useState<Record<
+    number,
+    {
+      replay: string;
+      bdr: string;
+      notes: string;
+    }
+  >>({});
 
   if (!parsedTeamId || notFound) {
     return <NotFoundPage />;
@@ -69,6 +80,7 @@ export function TeamPage() {
   );
 
   const stages = Object.values(groupedByStage).sort((a, b) => a.stage_index - b.stage_index);
+  const templateStages = groupTemplatesByStage(templates);
 
   return (
     <main className="p-4 space-y-6">
@@ -157,7 +169,14 @@ export function TeamPage() {
                                 ))}
                               </div>
                             )}
-                            {game.notes && <p className="text-sm text-gray-700">Notes: {game.notes}</p>}
+                            {game.notes && (
+                              <div className="flex items-center gap-1 text-sm text-gray-700">
+                                <span role="img" aria-label="Notes" title={game.notes}>
+                                  📝
+                                </span>
+                                <span className="sr-only">Notes available</span>
+                              </div>
+                            )}
                           </div>
 
                           {game.game_id && (
@@ -174,6 +193,184 @@ export function TeamPage() {
           </div>
         )}
       </section>
+
+      <section className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-semibold">Games</h2>
+          {templatesLoading && <p className="text-sm text-gray-600">Loading games…</p>}
+        </div>
+        {templatesError && <p className="text-red-600">{templatesError}</p>}
+        {!templatesLoading && templates.length === 0 && <p className="text-gray-600">No games found.</p>}
+        {!templatesLoading && templates.length > 0 && (
+          <div className="space-y-4">
+            {templateStages.map((stage) => (
+              <div key={stage.stage_label} className="border rounded-lg overflow-hidden">
+                <div className="px-3 py-2 bg-gray-50 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-semibold">{stage.stage_label}</span>
+                    <span className="text-xs text-gray-600 uppercase tracking-wide">{stage.stage_type}</span>
+                  </div>
+                </div>
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="bg-gray-100 text-left text-sm">
+                      <th className="px-3 py-2">Index</th>
+                      <th className="px-3 py-2">Variant</th>
+                      <th className="px-3 py-2">Score</th>
+                      <th className="px-3 py-2">Failure reason</th>
+                      <th className="px-3 py-2">BDR</th>
+                      <th className="px-3 py-2">Players</th>
+                      <th className="px-3 py-2">Date</th>
+                      <th className="px-3 py-2">Game ID</th>
+                      <th className="px-3 py-2">Notes</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {stage.templates.map((tpl) =>
+                      tpl.result ? (
+                        <PlayedRow key={tpl.template_id} template={tpl} />
+                      ) : (
+                        <UnplayedRow
+                          key={tpl.template_id}
+                          template={tpl}
+                          draft={drafts[tpl.template_id] ?? { replay: '', bdr: '', notes: '' }}
+                          onDraftChange={(next) =>
+                            setDrafts((prev) => ({ ...prev, [tpl.template_id]: next }))
+                          }
+                        />
+                      ),
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
     </main>
+  );
+}
+
+function groupTemplatesByStage(templates: TeamTemplate[]) {
+  const map = new Map<
+    string,
+    { stage_label: string; stage_type: string; stage_index: number; templates: TeamTemplate[] }
+  >();
+  templates.forEach((tpl) => {
+    const key = `${tpl.stage_index}-${tpl.stage_label}`;
+    if (!map.has(key)) {
+      map.set(key, {
+        stage_label: tpl.stage_label,
+        stage_type: tpl.stage_type,
+        stage_index: tpl.stage_index,
+        templates: [],
+      });
+    }
+    map.get(key)!.templates.push(tpl);
+  });
+  return Array.from(map.values()).sort((a, b) => a.stage_index - b.stage_index);
+}
+
+function PlayedRow({ template }: { template: TeamTemplate }) {
+  const r = template.result!;
+  const playedAt = r.played_at ? new Date(r.played_at) : null;
+  const score = r.score ?? '';
+  const reason = r.zero_reason ?? '';
+
+  return (
+    <tr className="border-t">
+      <td className="px-3 py-2 text-sm">{template.template_index}</td>
+      <td className="px-3 py-2 text-sm">{template.variant}</td>
+      <td className="px-3 py-2 text-sm">{score}</td>
+      <td className="px-3 py-2 text-sm">{reason}</td>
+      <td className="px-3 py-2 text-sm">{r.bottom_deck_risk ?? ''}</td>
+      <td className="px-3 py-2 text-sm text-gray-500">—</td>
+      <td className="px-3 py-2 text-sm">{playedAt ? playedAt.toLocaleString() : ''}</td>
+      <td className="px-3 py-2 text-sm">
+        {r.hanab_game_id ? (
+          <Link
+            to={`https://hanab.live/replay/${r.hanab_game_id}`}
+            className="text-blue-700 underline"
+            target="_blank"
+            rel="noreferrer"
+          >
+            {r.hanab_game_id}
+          </Link>
+        ) : (
+          ''
+        )}
+      </td>
+      <td className="px-3 py-2 text-sm">
+        {r.notes && (
+          <span role="img" aria-label="Notes" title={r.notes}>
+            📝
+          </span>
+        )}
+      </td>
+    </tr>
+  );
+}
+
+function UnplayedRow({
+  template,
+  draft,
+  onDraftChange,
+}: {
+  template: TeamTemplate;
+  draft: { replay: string; bdr: string; notes: string };
+  onDraftChange: (next: { replay: string; bdr: string; notes: string }) => void;
+}) {
+  const [showNotes, setShowNotes] = useState(
+    Boolean(draft.replay) || Boolean(draft.bdr) || Boolean(draft.notes),
+  );
+
+  const update = (patch: Partial<typeof draft>) => {
+    const next = { ...draft, ...patch };
+    onDraftChange(next);
+    setShowNotes(Boolean(next.replay) || Boolean(next.bdr) || Boolean(next.notes));
+  };
+
+  return (
+    <>
+      <tr className="border-t">
+        <td className="px-3 py-2 text-sm">{template.template_index}</td>
+        <td className="px-3 py-2 text-sm">{template.variant}</td>
+        <td className="px-3 py-2 text-sm text-gray-500">—</td>
+        <td className="px-3 py-2 text-sm text-gray-500">—</td>
+        <td className="px-3 py-2 text-sm">
+          <input
+            className="w-20 border rounded px-2 py-1 text-sm"
+            placeholder="BDR"
+            value={draft.bdr}
+            onChange={(e) => update({ bdr: e.target.value })}
+          />
+        </td>
+        <td className="px-3 py-2 text-sm text-gray-500">—</td>
+        <td className="px-3 py-2 text-sm text-gray-500">—</td>
+        <td className="px-3 py-2 text-sm">
+          <input
+            className="w-full border rounded px-2 py-1 text-sm"
+            placeholder="Game ID or replay URL"
+            value={draft.replay}
+            onChange={(e) => update({ replay: e.target.value })}
+          />
+        </td>
+        <td className="px-3 py-2 text-sm text-gray-500">—</td>
+      </tr>
+      {showNotes && (
+        <tr className="border-t bg-gray-50">
+          <td colSpan={9} className="px-3 py-2">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Notes (optional)</label>
+            <textarea
+              className="w-full border rounded px-3 py-2 text-sm"
+              rows={2}
+              placeholder="Add notes about this game"
+              value={draft.notes}
+              onChange={(e) => update({ notes: e.target.value })}
+            />
+          </td>
+        </tr>
+      )}
+    </>
   );
 }

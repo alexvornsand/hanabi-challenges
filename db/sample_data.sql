@@ -44,25 +44,25 @@ INSERT INTO events (
 )
 VALUES
   (
-    'No Variant 2025',
-    'no-var-2025',
-    'No Variant Event 2025',
-    $$Over the next wee while, we're going to play 100 games of No Var and aim to get the highest % of max score we can.\n\nTiers:\nover 70% max scores: 🥉\nBronze\nover 80% max scores: 🥈\nSilver\nover 90% max scores: 🥇\nGold\nover 95% max scores: 💎\nDiamond$$,
-    '2025-01-01T00:00:00Z',
-    '2025-12-31T23:59:59Z'
+    'Spring Circuit 2025',
+    'spring-circuit-2025',
+    'Seasonal spring ladder',
+    $$A seasonal circuit with mixed variants and rotating seeds.\nPlay clean, log your replays, and chase consistency across the whole stage.$$,
+    '2025-03-01T00:00:00Z',
+    '2025-06-01T00:00:00Z'
   ),
   (
-    'No Variant 2026',
-    'no-var-2026',
-    'No Variant Event 2026',
-    $$Over the next wee while, we're going to play 100 games of No Var and aim to get the highest % of max score we can.\n\nTiers:\nover 70% max scores: 🥉\nBronze\nover 80% max scores: 🥈\nSilver\nover 90% max scores: 🥇\nGold\nover 95% max scores: 💎\nDiamond$$,
-    '2026-01-01T00:00:00Z',
-    '2026-12-31T23:59:59Z'
+    'Summer Sprint 2025',
+    'summer-sprint-2025',
+    'Fast-paced sprint event',
+    $$Short sprint focused on quick plays. Mix of variants with fixed seeds for fairness.$$,
+    '2025-07-01T00:00:00Z',
+    '2025-09-01T00:00:00Z'
   );
 
 -- event_ids:
--- 1 = No Variant 2025
--- 2 = No Variant 2026
+-- 1 = Spring Circuit 2025
+-- 2 = Summer Sprint 2025
 
 
 -- ================================
@@ -70,8 +70,8 @@ VALUES
 -- ================================
 INSERT INTO event_stages (event_id, stage_index, label, stage_type, starts_at, ends_at)
 VALUES
-  (1, 1, 'Main Stage', 'SINGLE', '2025-01-01T00:00:00Z', '2025-12-31T23:59:59Z'),
-  (2, 1, 'Main Stage', 'SINGLE', '2026-01-01T00:00:00Z', '2026-12-31T23:59:59Z');
+  (1, 1, 'Main Stage', 'SINGLE', '2025-03-01T00:00:00Z', '2025-06-01T00:00:00Z'),
+  (2, 1, 'Main Stage', 'SINGLE', '2025-07-01T00:00:00Z', '2025-09-01T00:00:00Z');
 
 -- event_stage_ids:
 -- 1 = Event 1 Stage 1
@@ -84,24 +84,24 @@ VALUES
 -- For event 1 stage 1: template_index 1..5
 INSERT INTO event_game_templates (event_stage_id, template_index, variant, seed_payload)
 VALUES
-  (1, 1, 'NO_VARIANT', 'NVC2025-1'),
-  (1, 2, 'NO_VARIANT', 'NVC2025-2'),
-  (1, 3, 'NO_VARIANT', 'NVC2025-3'),
-  (1, 4, 'NO_VARIANT', 'NVC2025-4'),
-  (1, 5, 'NO_VARIANT', 'NVC2025-5');
+  (1, 1, 'NO_VARIANT', 'SC25-1'),
+  (1, 2, 'NO_VARIANT', 'SC25-2'),
+  (1, 3, 'NO_VARIANT', 'SC25-3'),
+  (1, 4, 'NO_VARIANT', 'SC25-4'),
+  (1, 5, 'NO_VARIANT', 'SC25-5');
 
 -- For event 2 stage 1: template_index 1..5
 INSERT INTO event_game_templates (event_stage_id, template_index, variant, seed_payload)
 VALUES
-  (2, 1, 'NO_VARIANT', 'NVC2026-1'),
-  (2, 2, 'NO_VARIANT', 'NVC2026-2'),
-  (2, 3, 'NO_VARIANT', 'NVC2026-3'),
-  (2, 4, 'NO_VARIANT', 'NVC2026-4'),
-  (2, 5, 'NO_VARIANT', 'NVC2026-5');
+  (2, 1, 'RAINBOW', 'SS25-1'),
+  (2, 2, 'RAINBOW', 'SS25-2'),
+  (2, 3, 'NO_VARIANT', 'SS25-3'),
+  (2, 4, 'NO_VARIANT', 'SS25-4'),
+  (2, 5, 'NO_VARIANT', 'SS25-5');
 
 -- event_game_template_ids:
--- 1..5  -> 2025 templates (index 1..5)
--- 6..10 -> 2026 templates (index 1..5)
+-- 1..5  -> Spring Circuit 2025 templates (index 1..5)
+-- 6..10 -> Summer Sprint 2025 templates (index 1..5)
 
 
 -- ================================
@@ -111,7 +111,7 @@ VALUES
 
 INSERT INTO event_teams (event_id, name, team_size)
 VALUES
-  (1, 'Lanterns',      2), -- 2p team (roster 3 players + 1 staff)
+  (1, 'Lanterns',      2), -- 2p team
   (1, 'Clue Crew',     3), -- 3p team
   (2, 'Faded Signals', 4), -- 4p team
   (2, 'Risky Fuses',   3); -- 3p team
