@@ -53,6 +53,7 @@ CREATE TABLE event_teams (
   name TEXT NOT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   team_size INTEGER NOT NULL CHECK (team_size IN (2, 3, 4, 5, 6)),
+  table_password TEXT,
   UNIQUE (event_id, name)
 );
 
@@ -109,6 +110,7 @@ CREATE TABLE event_game_templates (
   event_stage_id INTEGER NOT NULL REFERENCES event_stages(event_stage_id) ON DELETE CASCADE,
   template_index INTEGER NOT NULL,
   variant TEXT NOT NULL DEFAULT 'No Variant',  -- e.g. 'No Variant', 'Rainbow', etc.
+  max_score INTEGER NOT NULL DEFAULT 25,
   seed_payload TEXT, -- payload for this template
   metadata_json JSONB DEFAULT '{}'::jsonb,
   created_at TIMESTAMPTZ DEFAULT NOW(),

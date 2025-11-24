@@ -9,6 +9,7 @@ export interface EventTeam {
   name: string;
   team_size: number;
   created_at: string;
+  table_password?: string | null;
 }
 
 export interface EventTeamDetail extends EventTeam {
@@ -79,6 +80,11 @@ export interface TeamTemplateWithResult {
     notes: string | null;
     played_at: string;
     hanab_game_id: number | null;
+    players: {
+      display_name: string;
+      color_hex: string;
+      text_color: string;
+    }[];
   } | null;
 }
 
@@ -314,6 +320,7 @@ export async function getEventTeamDetail(eventTeamId: number): Promise<EventTeam
       t.event_id,
       t.name,
       t.team_size,
+      t.table_password,
       t.created_at,
       e.slug AS event_slug,
       e.name AS event_name
@@ -409,12 +416,40 @@ export async function listTeamTemplatesWithResults(
       g.bottom_deck_risk,
       g.notes,
       g.played_at,
-      g.game_id AS hanab_game_id
+      g.game_id AS hanab_game_id,
+      COALESCE(
+        json_agg(
+          json_build_object(
+            'display_name', u.display_name,
+            'color_hex', u.color_hex,
+            'text_color', u.text_color
+          )
+          ORDER BY u.display_name
+        ) FILTER (WHERE u.id IS NOT NULL),
+        '[]'::json
+      ) AS players
     FROM event_game_templates egt
     JOIN event_stages es ON es.event_stage_id = egt.event_stage_id
     JOIN event_teams t ON t.event_id = es.event_id
     LEFT JOIN event_games g ON g.event_game_template_id = egt.id AND g.event_team_id = t.id
+    LEFT JOIN game_participants gp ON gp.event_game_id = g.id
+    LEFT JOIN users u ON u.id = gp.user_id
     WHERE t.id = $1
+    GROUP BY
+      es.stage_index,
+      es.label,
+      es.stage_type,
+      egt.id,
+      egt.template_index,
+      egt.variant,
+      egt.seed_payload,
+      g.id,
+      g.score,
+      g.zero_reason,
+      g.bottom_deck_risk,
+      g.notes,
+      g.played_at,
+      g.game_id
     ORDER BY es.stage_index, egt.template_index;
     `,
     [eventTeamId],
@@ -437,6 +472,18 @@ export async function listTeamTemplatesWithResults(
           notes: row.notes,
           played_at: row.played_at,
           hanab_game_id: row.hanab_game_id,
+          players: (() => {
+            if (Array.isArray(row.players)) return row.players;
+            if (typeof row.players === 'string') {
+              try {
+                const parsed = JSON.parse(row.players);
+                return Array.isArray(parsed) ? parsed : [];
+              } catch {
+                return [];
+              }
+            }
+            return [];
+          })(),
         }
       : null,
   }));

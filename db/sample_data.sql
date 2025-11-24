@@ -82,22 +82,22 @@ VALUES
 -- Event game templates
 -- ================================
 -- For event 1 stage 1: template_index 1..5
-INSERT INTO event_game_templates (event_stage_id, template_index, variant, seed_payload)
+INSERT INTO event_game_templates (event_stage_id, template_index, variant, seed_payload, max_score)
 VALUES
-  (1, 1, 'NO_VARIANT', 'SC25-1'),
-  (1, 2, 'NO_VARIANT', 'SC25-2'),
-  (1, 3, 'NO_VARIANT', 'SC25-3'),
-  (1, 4, 'NO_VARIANT', 'SC25-4'),
-  (1, 5, 'NO_VARIANT', 'SC25-5');
+  (1, 1, 'No Variant', 'SC25-1', 25),
+  (1, 2, 'No Variant', 'SC25-2', 25),
+  (1, 3, 'No Variant', 'SC25-3', 25),
+  (1, 4, 'No Variant', 'SC25-4', 25),
+  (1, 5, 'No Variant', 'SC25-5', 25);
 
 -- For event 2 stage 1: template_index 1..5
-INSERT INTO event_game_templates (event_stage_id, template_index, variant, seed_payload)
+INSERT INTO event_game_templates (event_stage_id, template_index, variant, seed_payload, max_score)
 VALUES
-  (2, 1, 'RAINBOW', 'SS25-1'),
-  (2, 2, 'RAINBOW', 'SS25-2'),
-  (2, 3, 'NO_VARIANT', 'SS25-3'),
-  (2, 4, 'NO_VARIANT', 'SS25-4'),
-  (2, 5, 'NO_VARIANT', 'SS25-5');
+  (2, 1, 'Rainbow', 'SS25-1', 25),
+  (2, 2, 'Rainbow', 'SS25-2', 25),
+  (2, 3, 'No Variant', 'SS25-3', 25),
+  (2, 4, 'No Variant', 'SS25-4', 25),
+  (2, 5, 'No Variant', 'SS25-5', 25);
 
 -- event_game_template_ids:
 -- 1..5  -> Spring Circuit 2025 templates (index 1..5)
@@ -109,12 +109,12 @@ VALUES
 -- ================================
 -- team_size = number of players at the table (per game), not roster size.
 
-INSERT INTO event_teams (event_id, name, team_size)
+INSERT INTO event_teams (event_id, name, team_size, table_password)
 VALUES
-  (1, 'Lanterns',      2), -- 2p team
-  (1, 'Clue Crew',     3), -- 3p team
-  (2, 'Faded Signals', 4), -- 4p team
-  (2, 'Risky Fuses',   3); -- 3p team
+  (1, 'Lanterns',      2, 'team1234'), -- 2p team
+  (1, 'Clue Crew',     3, 'team1234'), -- 3p team
+  (2, 'Faded Signals', 4, 'team1234'), -- 4p team
+  (2, 'Risky Fuses',   3, 'team1234'); -- 3p team
 
 -- event_team_ids:
 -- 1 = Lanterns       (event 1)

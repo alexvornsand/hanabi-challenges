@@ -17,6 +17,7 @@ export type TeamTemplate = {
     notes: string | null;
     played_at: string;
     hanab_game_id: number | null;
+    players?: { display_name: string; color_hex: string; text_color: string }[];
   } | null;
 };
 

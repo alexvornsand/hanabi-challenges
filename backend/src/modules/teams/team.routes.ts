@@ -58,6 +58,14 @@ router.get('/:id/templates', async (req: Request, res: Response) => {
     }
 
     const templates = await listTeamTemplatesWithResults(eventTeamId);
+    console.log('[team:templates]', {
+      teamId: eventTeamId,
+      templates: templates.map((t) => ({
+        template_id: t.template_id,
+        result_id: t.result?.id ?? null,
+        players: t.result?.players ?? [],
+      })),
+    });
     res.json({ team, templates });
   } catch (err) {
     console.error('Error fetching team templates:', err);

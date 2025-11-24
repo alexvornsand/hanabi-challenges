@@ -18,7 +18,8 @@ const router = Router();
  *   "zero_reason": "Strike Out" | "Time Out" | "VTK" | null,
  *   "bottom_deck_risk": number | null,
  *   "notes": string | null,
- *   "played_at": string | null         // ISO timestamp, optional
+ *   "played_at": string | null,        // ISO timestamp, optional
+ *   "players": string[]                // optional display_names in seat order
  * }
  */
 router.post('/', authRequired, async (req: Request, res: Response) => {
@@ -31,7 +32,19 @@ router.post('/', authRequired, async (req: Request, res: Response) => {
     bottom_deck_risk,
     notes,
     played_at,
+    players,
   } = req.body;
+
+  console.log('[results:create] incoming', {
+    event_team_id,
+    event_game_template_id,
+    game_id,
+    score,
+    zero_reason,
+    bottom_deck_risk,
+    played_at,
+    playersCount: Array.isArray(players) ? players.length : 0,
+  });
 
   if (event_team_id == null || event_game_template_id == null || score == null) {
     res.status(400).json({
@@ -62,10 +75,14 @@ router.post('/', authRequired, async (req: Request, res: Response) => {
       bottom_deck_risk: bottom_deck_risk === undefined ? null : Number(bottom_deck_risk),
       notes: notes ?? null,
       played_at: played_at ?? null,
+      players: Array.isArray(players) ? (players as string[]) : undefined,
     });
+
+    console.log('[results:create] success', { id: row.id, event_team_id, event_game_template_id });
 
     res.status(201).json(row);
   } catch (err) {
+    console.error('[results:create] error', err);
     if (err.code === 'GAME_RESULT_EXISTS') {
       res.status(409).json({
         error: 'A game result already exists for this team and template',

@@ -1,1 +1,0 @@
-// Type declarations placeholder (empty)

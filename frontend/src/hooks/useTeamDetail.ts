@@ -44,6 +44,7 @@ export type TeamDetail = {
     created_at: string;
     event_slug: string;
     event_name: string;
+    table_password?: string | null;
   };
   members: TeamMember[];
   games: TeamGame[];

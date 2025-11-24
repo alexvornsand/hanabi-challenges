@@ -163,6 +163,7 @@ export async function listEventGameTemplates(eventId: number): Promise<EventGame
       egt.template_index,
       egt.variant,
       egt.seed_payload,
+      egt.max_score,
       egt.metadata_json,
       egt.created_at
     FROM event_game_templates egt
@@ -185,6 +186,7 @@ export async function createEventGameTemplate(
     template_index: number;
     variant?: string | null;
     seed_payload?: string | null;
+    max_score?: number | null;
     metadata_json?: unknown;
   },
 ): Promise<EventGameTemplate> {
@@ -192,9 +194,11 @@ export async function createEventGameTemplate(
     template_index,
     variant = null,
     seed_payload = null,
+    max_score = 25,
     metadata_json = {},
   } = input;
   const normalizedVariant = variant ?? 'No Variant';
+  const normalizedMaxScore = max_score ?? 25;
   const normalizedMetadata = metadata_json ?? {};
 
   try {
@@ -205,12 +209,13 @@ export async function createEventGameTemplate(
         template_index,
         variant,
         seed_payload,
+        max_score,
         metadata_json
       )
       VALUES ($1, $2, $3, $4, $5)
-      RETURNING id, event_stage_id, template_index, variant, seed_payload, metadata_json, created_at;
+      RETURNING id, event_stage_id, template_index, variant, seed_payload, max_score, metadata_json, created_at;
       `,
-      [eventStageId, template_index, normalizedVariant, seed_payload, normalizedMetadata],
+      [eventStageId, template_index, normalizedVariant, seed_payload, normalizedMaxScore, normalizedMetadata],
     );
 
     return result.rows[0];

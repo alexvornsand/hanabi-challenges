@@ -11,6 +11,7 @@ import {
   createEventStage,
 } from './event.service';
 import { pool } from '../../config/db';
+import { listTeamMembers } from '../teams/team.service';
 
 const router = Router();
 
@@ -226,6 +227,249 @@ router.post('/:slug/register', authRequired, async (req: AuthenticatedRequest, r
   }
 });
 
+/* ------------------------------------------
+ *  POST /api/events/:slug/teams/:teamId/validate-replay
+ *  Live-validate a replay URL/ID against team + template
+ * ----------------------------------------*/
+router.post('/:slug/teams/:teamId/validate-replay', authRequired, async (req: AuthenticatedRequest, res: Response) => {
+  const { slug, teamId } = req.params;
+  const body = req.body as { template_id?: number; templateId?: number; replay?: string };
+  const templateIdRaw = body.template_id ?? body.templateId ?? (req.query.template_id as string | undefined);
+  const template_id = templateIdRaw != null ? Number(templateIdRaw) : undefined;
+  const { replay } = body;
+  let step = 'start';
+
+  console.log('[validate-replay] start', {
+    slug,
+    teamId,
+    template_id,
+    replaySnippet: replay?.slice?.(0, 100),
+  });
+
+  if (!template_id || Number.isNaN(template_id) || !replay) {
+    console.warn('[validate-replay] missing fields', { template_id, replayPresent: !!replay });
+    return res.status(400).json({ error: 'template_id and replay are required' });
+  }
+
+  const gameId = parseGameId(replay);
+  if (!gameId) {
+    console.warn('[validate-replay] parse fail', { replay });
+    return res.status(400).json({ error: 'Unable to parse game id from replay/link' });
+  }
+
+  const teamIdNum = Number(teamId);
+  if (!Number.isInteger(teamIdNum)) {
+    return res.status(400).json({ error: 'Invalid team id' });
+  }
+
+  try {
+    step = 'lookup event';
+    const eventId = await getEventId(slug);
+    if (!eventId) return res.status(404).json({ error: 'Event not found' });
+    console.log('[validate-replay] event', { eventId });
+
+    step = 'lookup team';
+    const teamResult = await pool.query(
+      `
+      SELECT id, team_size, event_id
+      FROM event_teams
+      WHERE id = $1 AND event_id = $2;
+      `,
+      [teamIdNum, eventId],
+    );
+    if (teamResult.rowCount === 0) {
+      return res.status(404).json({ error: 'Team not found for this event' });
+    }
+    const team = teamResult.rows[0] as { id: number; team_size: number; event_id: number };
+    console.log('[validate-replay] team', { team });
+
+    step = 'lookup template';
+    const tplResult = await pool.query(
+      `
+      SELECT egt.id, egt.seed_payload, egt.variant, es.event_id
+      FROM event_game_templates egt
+      JOIN event_stages es ON es.event_stage_id = egt.event_stage_id
+      WHERE egt.id = $1;
+      `,
+      [template_id],
+    );
+    if (tplResult.rowCount === 0) {
+      return res.status(404).json({ error: 'Template not found' });
+    }
+    const tpl = tplResult.rows[0] as { id: number; seed_payload: string | null; variant: string; event_id: number };
+    if (tpl.event_id !== eventId) {
+      return res.status(400).json({ error: 'Template does not belong to this event' });
+    }
+    console.log('[validate-replay] template', { tpl });
+
+    const members = await listTeamMembers(team.id);
+    const memberNames = members.map((m) => m.display_name);
+    console.log('[validate-replay] members', memberNames);
+
+    // Stage 1: fetch export and validate players/seed/size
+    step = 'fetch export';
+    const exportJson = await fetchJsonWithTimeout(`https://hanab.live/export/${gameId}`);
+    console.log('[validate-replay] export fetched', {
+      keys: Object.keys(exportJson ?? {}),
+      players: exportJson?.players ?? exportJson?.playerNames ?? exportJson?.player_names,
+      seed: exportJson?.seed,
+    });
+    if (!exportJson || typeof exportJson !== 'object') {
+      return res.status(400).json({ error: 'Invalid export payload from hanab.live' });
+    }
+    const exportPlayers =
+      exportJson.players ??
+      exportJson.playerNames ??
+      exportJson.player_names ??
+      [];
+    const seedString = exportJson.seed ?? '';
+
+    // Check players subset
+    const missingPlayers = exportPlayers.filter((p) => !memberNames.includes(p));
+    if (missingPlayers.length > 0) {
+      return res.status(400).json({ error: `Replay includes players not on this team: ${missingPlayers.join(', ')}` });
+    }
+
+    // Check seed and player count from seed string
+    const seedMatch = seedString.match(/p(\d+)v\d+s([A-Za-z0-9]+)/);
+    if (!seedMatch) {
+      return res.status(400).json({ error: 'Seed string from replay is not in expected format' });
+    }
+    const seedPlayers = Number(seedMatch[1]);
+    const seedSuffix = seedMatch[2];
+    console.log('[validate-replay] seed parsed', { seedPlayers, seedSuffix });
+    if (seedPlayers !== team.team_size) {
+      return res.status(400).json({ error: `Replay is for ${seedPlayers}p but team is ${team.team_size}p` });
+    }
+    if (tpl.seed_payload && seedSuffix !== tpl.seed_payload) {
+      return res.status(400).json({ error: `Replay seed ${seedSuffix} does not match template seed ${tpl.seed_payload}` });
+    }
+
+    // Stage 2: fetch history-full for first player and check variant/flags/score
+    let historyData: any = null;
+    if (exportPlayers.length > 0) {
+      const player = exportPlayers[0];
+      step = 'fetch history';
+      historyData = await fetchJsonWithTimeout(
+        `https://hanab.live/api/v1/history-full/${encodeURIComponent(player)}?start=${gameId}&end=${gameId}`,
+      );
+      console.log('[validate-replay] history fetched', {
+        player,
+        keys: historyData ? Object.keys(historyData) : [],
+        array: Array.isArray(historyData),
+      });
+    }
+
+    let historyVariant = null;
+    let flagsOk = true;
+    let score: number | null = null;
+    let endCondition: number | null = null;
+    let playedAt: string | null = null;
+
+    // history-full returns an array for single-user queries. For multi-user it can be {games: []}
+    const historyGames = Array.isArray(historyData)
+      ? historyData
+      : Array.isArray(historyData?.games)
+        ? historyData.games
+        : [];
+
+    if (historyGames.length > 0) {
+      const game = historyGames.find(
+        (g: any) => String(g.id ?? g.gameId ?? g.game_id) === String(gameId),
+      );
+      if (game) {
+        const opts = game.options ?? {};
+        historyVariant = game.variantName ?? opts.variantName ?? game.variant ?? opts.variant;
+        const flags = {
+          cardCycle: game.cardCycle ?? opts.cardCycle,
+          deckPlays: game.deckPlays ?? opts.deckPlays,
+          emptyClues: game.emptyClues ?? opts.emptyClues,
+          oneExtraCard: game.oneExtraCard ?? opts.oneExtraCard,
+          oneLessCard: game.oneLessCard ?? opts.oneLessCard,
+          allOrNothing: game.allOrNothing ?? opts.allOrNothing,
+          detrimentalCharacters: game.detrimentalCharacters ?? opts.detrimentalCharacters,
+        };
+        flagsOk = Object.values(flags).every((v) => v === false || v === undefined);
+        score = game.score ?? null;
+        endCondition = game.endCondition ?? null;
+        playedAt = game.datetimeFinished ?? game.datetimeFinishedUtc ?? game.datetime_finished ?? null;
+      }
+    }
+
+    if (historyVariant && historyVariant !== tpl.variant) {
+      return res.status(400).json({ error: `Replay variant ${historyVariant} does not match template variant ${tpl.variant}` });
+    }
+    if (!flagsOk) {
+      return res.status(400).json({ error: 'Replay uses unsupported optional rules (flags should be false)' });
+    }
+
+    console.log('[validate-replay] success', {
+      gameId,
+      exportPlayers,
+      seedString,
+      derived: { seedSuffix, seedPlayers, historyVariant, score, endCondition, playedAt },
+    });
+
+    return res.json({
+      ok: true,
+      gameId,
+      export: {
+        players: exportPlayers,
+        seed: seedString,
+      },
+      derived: {
+        seedSuffix,
+        teamSize: seedPlayers,
+        variant: historyVariant ?? tpl.variant,
+        score,
+        endCondition,
+        playedAt,
+      },
+    });
+  } catch (err) {
+    const e = err as { message?: string; code?: string; stack?: string };
+    const message = e.message ?? 'Failed to validate replay';
+    if (message === 'timeout') {
+      return res
+        .status(504)
+        .json({ error: 'Validation timed out contacting hanab.live', code: 'TIMEOUT', details: message, step });
+    }
+      console.error('Error validating replay:', err);
+      res.status(502).json({
+        error: `Failed to validate replay: ${message}`,
+        code: e.code ?? 'FETCH_FAILED',
+        details: e.stack ?? String(err),
+        step,
+      });
+  }
+});
+
+async function fetchJsonWithTimeout(url: string, ms = 4000) {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), ms);
+  try {
+    const resp = await fetch(url, { signal: controller.signal });
+    if (!resp.ok) {
+      throw new Error(`Request failed (${resp.status})`);
+    }
+    return await resp.json();
+  } catch (err) {
+    if ((err as { name?: string }).name === 'AbortError') {
+      throw new Error('timeout');
+    }
+    throw err;
+  } finally {
+    clearTimeout(id);
+  }
+}
+
+function parseGameId(input: string | null | undefined): string | null {
+  if (!input) return null;
+  const trimmed = input.trim();
+  const matchUrl = trimmed.match(/(?:replay|shared-replay)\/(\d+)/i);
+  const matchId = trimmed.match(/^\d+$/);
+  return matchUrl ? matchUrl[1] : matchId ? matchId[0] : null;
+}
 /* ------------------------------------------
  *  POST /api/events  (ADMIN)
  * ----------------------------------------*/
