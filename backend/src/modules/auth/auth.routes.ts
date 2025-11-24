@@ -1,6 +1,6 @@
 // src/modules/auth/auth.routes.ts
 import { Router, type Request, type Response } from 'express';
-import { authRequired, AuthenticatedRequest } from '../../middleware/authMiddleware';
+import { authRequired, AuthenticatedRequest, requireSuperadmin } from '../../middleware/authMiddleware';
 import { loginOrCreateUser, pickTextColor, randomHexColor } from './auth.service';
 import { pool } from '../../config/db';
 
@@ -117,12 +117,12 @@ router.get('/users/:display_name/events', async (req: Request, res: Response) =>
   }
 });
 
-// GET /api/users (for autocomplete)
+// GET /api/users (for autocomplete / admin)
 router.get('/users', async (_req: Request, res: Response) => {
   try {
     const result = await pool.query(
       `
-      SELECT id, display_name, color_hex, text_color
+      SELECT id, display_name, color_hex, text_color, role
       FROM users
       ORDER BY display_name;
       `,
@@ -133,5 +133,62 @@ router.get('/users', async (_req: Request, res: Response) => {
     res.status(500).json({ error: 'Failed to fetch users' });
   }
 });
+
+async function updateUserRole(req: AuthenticatedRequest, res: Response) {
+  const userId = Number(req.params.id);
+  const { role } = req.body as { role?: string };
+  const actor = req.user;
+
+  if (Number.isNaN(userId)) {
+    return res.status(400).json({ error: 'Invalid user id' });
+  }
+  if (role !== 'ADMIN' && role !== 'USER') {
+    return res.status(400).json({ error: 'role must be ADMIN or USER' });
+  }
+  if (actor && actor.userId === userId) {
+    return res.status(400).json({ error: 'You cannot change your own role' });
+  }
+
+  try {
+    const targetResult = await pool.query(
+      `
+      SELECT id, role
+      FROM users
+      WHERE id = $1;
+      `,
+      [userId],
+    );
+
+    if (targetResult.rowCount === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const target = targetResult.rows[0] as { id: number; role: string };
+
+    // Do not modify SUPERADMINs via this endpoint
+    if (target.role === 'SUPERADMIN') {
+      return res.status(400).json({ error: 'Cannot change a SUPERADMIN role here' });
+    }
+
+    await pool.query(
+      `
+      UPDATE users
+      SET role = $1
+      WHERE id = $2;
+      `,
+      [role, userId],
+    );
+
+    res.json({ id: userId, role });
+  } catch (err) {
+    console.error('Error updating role:', err);
+    res.status(500).json({ error: 'Failed to update role' });
+  }
+}
+
+// PATCH /api/users/:id/role (SUPERADMIN only)
+router.patch('/users/:id/role', authRequired, requireSuperadmin, updateUserRole);
+// POST alias for convenience
+router.post('/users/:id/role', authRequired, requireSuperadmin, updateUserRole);
 
 export default router;
