@@ -18,6 +18,25 @@ export interface AuthenticatedRequest extends Request {
   user?: AuthPayload;
 }
 
+// Attempt to authenticate if Authorization header is present; otherwise continue
+export function authOptional(req: AuthenticatedRequest, _res: Response, next: NextFunction): void {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return next();
+  }
+
+  const token = authHeader.slice('Bearer '.length);
+
+  try {
+    const payload = jwt.verify(token, env.JWT_SECRET) as AuthPayload;
+    req.user = payload;
+  } catch {
+    // Ignore invalid tokens for optional auth; treat as unauthenticated
+  }
+
+  next();
+}
+
 // Require a valid JWT
 export function authRequired(req: AuthenticatedRequest, res: Response, next: NextFunction): void {
   const authHeader = req.headers.authorization;

@@ -10,8 +10,28 @@ import {
   getChallengeBySlug,
 } from './challenge.service';
 import { pool } from '../../config/db';
+import { validateSlug } from '../../utils/slug';
 
 const router = Router();
+
+const MAX_NAME_LENGTH = 100;
+const MAX_SHORT_DESC_LENGTH = 500;
+const MAX_DESC_LENGTH = 10000;
+
+function validateLength(field: string, value: string | null | undefined, opts: { min?: number; max?: number }) {
+  if (value == null) return null;
+  if (typeof value !== 'string') {
+    return `${field} must be a string`;
+  }
+  const trimmed = value.trim();
+  if (opts.min && trimmed.length < opts.min) {
+    return `${field} must be at least ${opts.min} characters`;
+  }
+  if (opts.max && trimmed.length > opts.max) {
+    return `${field} must be at most ${opts.max} characters`;
+  }
+  return null;
+}
 
 /* ------------------------------------------
  *  Helper: look up numeric challenge_id from slug
@@ -46,6 +66,23 @@ router.post('/', authRequired, requireAdmin, async (req: Request, res: Response)
   if (!name) return res.status(400).json({ error: 'name is required' });
   if (!slug) return res.status(400).json({ error: 'slug is required' });
   if (!long_description) return res.status(400).json({ error: 'long_description is required' });
+
+  const slugError = validateSlug(slug);
+  if (slugError) return res.status(400).json({ error: slugError });
+
+  const nameError = validateLength('name', name, { min: 3, max: MAX_NAME_LENGTH });
+  if (nameError) return res.status(400).json({ error: nameError });
+
+  const shortDescError = validateLength('short_description', short_description, {
+    max: MAX_SHORT_DESC_LENGTH,
+  });
+  if (shortDescError) return res.status(400).json({ error: shortDescError });
+
+  const longDescError = validateLength('long_description', long_description, {
+    min: 10,
+    max: MAX_DESC_LENGTH,
+  });
+  if (longDescError) return res.status(400).json({ error: longDescError });
   if (starts_at && ends_at) {
     const startDate = new Date(starts_at);
     const endDate = new Date(ends_at);

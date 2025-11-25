@@ -41,10 +41,10 @@ describe('event.service (integration)', () => {
 
     await pool.query(
       `
-      INSERT INTO events (name, slug, short_description, long_description, starts_at, ends_at)
+      INSERT INTO events (name, slug, short_description, long_description, starts_at, ends_at, published)
       VALUES 
-        ($1, $2, $3, $4, $5, $6),
-        ($7, $8, $9, $10, $11, $12);
+        ($1, $2, $3, $4, $5, $6, TRUE),
+        ($7, $8, $9, $10, $11, $12, TRUE);
       `,
       [
         'No Variant 2025',
@@ -214,8 +214,8 @@ describe('event.service (integration)', () => {
 
     await pool.query(
       `
-      INSERT INTO events (name, slug, short_description, long_description, starts_at, ends_at)
-      VALUES ($1, $2, $3, $4, $5, $6);
+      INSERT INTO events (name, slug, short_description, long_description, starts_at, ends_at, published)
+      VALUES ($1, $2, $3, $4, $5, $6, TRUE);
       `,
       ['No Variant 2025', slug, 'short desc', 'Long description text', now, now],
     );

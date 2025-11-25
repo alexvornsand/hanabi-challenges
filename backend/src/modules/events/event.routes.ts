@@ -1,6 +1,6 @@
 // src/modules/events/event.routes.ts
 import { Router, Request, Response } from 'express';
-import { authRequired, requireAdmin, AuthenticatedRequest } from '../../middleware/authMiddleware';
+import { authRequired, authOptional, requireAdmin, AuthenticatedRequest } from '../../middleware/authMiddleware';
 import {
   listEvents,
   createEvent,
@@ -13,8 +13,34 @@ import {
 } from './event.service';
 import { pool } from '../../config/db';
 import { listTeamMembers } from '../teams/team.service';
+import { validateSlug } from '../../utils/slug';
 
 const router = Router();
+
+const MAX_NAME_LENGTH = 100;
+const MAX_DESC_LENGTH = 10000;
+const MAX_SHORT_DESC_LENGTH = 500;
+const MAX_TEAM_NAME_LENGTH = 100;
+
+function isAdminUser(req: AuthenticatedRequest): boolean {
+  const role = req.user?.role;
+  return role === 'ADMIN' || role === 'SUPERADMIN';
+}
+
+function validateLength(field: string, value: string | null | undefined, opts: { min?: number; max?: number }) {
+  if (value == null) return null;
+  if (typeof value !== 'string') {
+    return `${field} must be a string`;
+  }
+  const trimmed = value.trim();
+  if (opts.min && trimmed.length < opts.min) {
+    return `${field} must be at least ${opts.min} characters`;
+  }
+  if (opts.max && trimmed.length > opts.max) {
+    return `${field} must be at most ${opts.max} characters`;
+  }
+  return null;
+}
 
 /* ------------------------------------------
  *  Helper: look up numeric event_id from slug
@@ -30,9 +56,10 @@ async function getEventId(slug: string): Promise<number | null> {
 /* ------------------------------------------
  *  GET /api/events
  * ----------------------------------------*/
-router.get('/', async (_req: Request, res: Response) => {
+router.get('/', authOptional, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const events = await listEvents();
+    const includeUnpublished = isAdminUser(req);
+    const events = await listEvents({ includeUnpublished });
     res.json(events);
   } catch (err) {
     console.error('Error fetching events:', err);
@@ -86,6 +113,14 @@ router.post('/:slug/register', authRequired, async (req: AuthenticatedRequest, r
     return res.status(400).json({ error: 'team_name, team_size, and members are required' });
   }
 
+  const teamNameError = validateLength('team_name', team_name, {
+    min: 2,
+    max: MAX_TEAM_NAME_LENGTH,
+  });
+  if (teamNameError) {
+    return res.status(400).json({ error: teamNameError });
+  }
+
   const sizeNum = Number(team_size);
   if (!Number.isInteger(sizeNum) || sizeNum < 2 || sizeNum > 6) {
     return res.status(400).json({ error: 'team_size must be an integer between 2 and 6' });
@@ -117,15 +152,79 @@ router.post('/:slug/register', authRequired, async (req: AuthenticatedRequest, r
   try {
     await client.query('BEGIN');
 
-    const eventResult = await client.query<{ id: number }>(
-      `SELECT id FROM events WHERE slug = $1`,
+    const eventResult = await client.query<{
+      id: number;
+      published: boolean;
+      allow_late_registration: boolean;
+      registration_cutoff: string | null;
+      starts_at: string | null;
+      ends_at: string | null;
+    }>(
+      `
+      SELECT
+        id,
+        published,
+        allow_late_registration,
+        registration_cutoff,
+        starts_at,
+        ends_at
+      FROM events
+      WHERE slug = $1
+      `,
       [slug],
     );
     if (eventResult.rowCount === 0) {
       await client.query('ROLLBACK');
       return res.status(404).json({ error: 'Event not found' });
     }
-    const eventId = eventResult.rows[0].id;
+    const eventRow = eventResult.rows[0] as {
+      id: number;
+      published: boolean;
+      allow_late_registration: boolean;
+      registration_cutoff: string | null;
+      starts_at: string | null;
+      ends_at: string | null;
+    };
+    const eventId = eventRow.id;
+    const isAdmin = isAdminUser(req);
+
+    const now = new Date();
+    const startsAt = eventRow.starts_at ? new Date(eventRow.starts_at) : null;
+    const endsAt = eventRow.ends_at ? new Date(eventRow.ends_at) : null;
+    const cutoff = eventRow.registration_cutoff ? new Date(eventRow.registration_cutoff) : null;
+
+    if (!isAdmin && !eventRow.published) {
+      await client.query('ROLLBACK');
+      return res.status(403).json({ error: 'Registration is not open for this event' });
+    }
+
+    if (startsAt && Number.isNaN(startsAt.getTime())) {
+      await client.query('ROLLBACK');
+      return res.status(500).json({ error: 'Event start time is invalid' });
+    }
+    if (endsAt && Number.isNaN(endsAt.getTime())) {
+      await client.query('ROLLBACK');
+      return res.status(500).json({ error: 'Event end time is invalid' });
+    }
+    if (cutoff && Number.isNaN(cutoff.getTime())) {
+      await client.query('ROLLBACK');
+      return res.status(500).json({ error: 'Event registration cutoff is invalid' });
+    }
+
+    if (!isAdmin) {
+      if (startsAt && now < startsAt) {
+        await client.query('ROLLBACK');
+        return res.status(403).json({ error: 'Registration has not opened yet' });
+      }
+      if (cutoff && now > cutoff && !eventRow.allow_late_registration) {
+        await client.query('ROLLBACK');
+        return res.status(403).json({ error: 'Registration is closed for this event' });
+      }
+      if (!eventRow.allow_late_registration && endsAt && now > endsAt) {
+        await client.query('ROLLBACK');
+        return res.status(403).json({ error: 'Registration is closed for this event' });
+      }
+    }
 
     // Check if any member already has a team in this event with the same size
     const memberUserIds = memberEntries.map((m) => m.user_id).filter((id) => id != null) as number[];
@@ -488,8 +587,25 @@ router.post('/', authRequired, requireAdmin, async (req: Request, res: Response)
   } = req.body;
 
   if (!name) return res.status(400).json({ error: 'name is required' });
-  if (!slug) return res.status(400).json({ error: 'slug is required' });
   if (!long_description) return res.status(400).json({ error: 'long_description is required' });
+
+  const slugError = validateSlug(slug);
+  if (slugError) return res.status(400).json({ error: slugError });
+
+  const nameError = validateLength('name', name, { min: 3, max: MAX_NAME_LENGTH });
+  if (nameError) return res.status(400).json({ error: nameError });
+
+  const shortDescError = validateLength('short_description', short_description, {
+    max: MAX_SHORT_DESC_LENGTH,
+  });
+  if (shortDescError) return res.status(400).json({ error: shortDescError });
+
+  const longDescError = validateLength('long_description', long_description, {
+    min: 10,
+    max: MAX_DESC_LENGTH,
+  });
+  if (longDescError) return res.status(400).json({ error: longDescError });
+
   if (starts_at && ends_at) {
     const startDate = new Date(starts_at);
     const endDate = new Date(ends_at);
@@ -534,6 +650,31 @@ router.put('/:slug', authRequired, requireAdmin, async (req: Request, res: Respo
   const { name, new_slug, short_description, long_description, starts_at, ends_at, published } =
     req.body;
 
+  if (new_slug) {
+    const slugError = validateSlug(new_slug);
+    if (slugError) return res.status(400).json({ error: slugError });
+  }
+
+  if (name) {
+    const nameError = validateLength('name', name, { min: 3, max: MAX_NAME_LENGTH });
+    if (nameError) return res.status(400).json({ error: nameError });
+  }
+
+  if (short_description !== undefined) {
+    const shortDescError = validateLength('short_description', short_description, {
+      max: MAX_SHORT_DESC_LENGTH,
+    });
+    if (shortDescError) return res.status(400).json({ error: shortDescError });
+  }
+
+  if (long_description !== undefined) {
+    const longDescError = validateLength('long_description', long_description, {
+      min: 10,
+      max: MAX_DESC_LENGTH,
+    });
+    if (longDescError) return res.status(400).json({ error: longDescError });
+  }
+
   if (starts_at && ends_at) {
     const startDate = new Date(starts_at);
     const endDate = new Date(ends_at);
@@ -572,11 +713,12 @@ router.put('/:slug', authRequired, requireAdmin, async (req: Request, res: Respo
 /* ------------------------------------------
  *  GET /api/events/:slug
  * ----------------------------------------*/
-router.get('/:slug', async (req: Request, res: Response) => {
+router.get('/:slug', authOptional, async (req: AuthenticatedRequest, res: Response) => {
   const { slug } = req.params;
 
   try {
-    const event = await getEventBySlug(slug);
+    const includeUnpublished = isAdminUser(req);
+    const event = await getEventBySlug(slug, { includeUnpublished });
 
     if (!event) {
       return res.status(404).json({ error: 'Event not found' });
@@ -599,6 +741,13 @@ router.post('/:slug/stages', authRequired, requireAdmin, async (req: Request, re
 
   if (stage_index == null || !label || !stage_type) {
     return res.status(400).json({ error: 'stage_index, label, and stage_type are required' });
+  }
+
+  if (
+    config_json !== undefined &&
+    (config_json === null || typeof config_json !== 'object' || Array.isArray(config_json))
+  ) {
+    return res.status(400).json({ error: 'config_json must be an object if provided' });
   }
 
   try {
@@ -657,6 +806,13 @@ router.post(
 
     if (event_stage_id == null || template_index == null) {
       return res.status(400).json({ error: 'event_stage_id and template_index are required' });
+    }
+
+    if (
+      metadata_json !== undefined &&
+      (metadata_json === null || typeof metadata_json !== 'object' || Array.isArray(metadata_json))
+    ) {
+      return res.status(400).json({ error: 'metadata_json must be an object if provided' });
     }
 
     try {

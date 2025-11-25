@@ -92,7 +92,10 @@ export interface UpdateEventInput {
 /* ------------------------------------------
  * List all events
  * ----------------------------------------*/
-export async function listEvents(): Promise<Event[]> {
+export async function listEvents(options: { includeUnpublished?: boolean } = {}): Promise<Event[]> {
+  const includeUnpublished = options.includeUnpublished ?? false;
+  const where = includeUnpublished ? '' : 'WHERE published = TRUE';
+
   const result = await pool.query<Event>(
     `
     SELECT
@@ -107,6 +110,7 @@ export async function listEvents(): Promise<Event[]> {
       starts_at,
       ends_at
     FROM events
+    ${where}
     ORDER BY starts_at NULLS LAST, id
     `,
   );
@@ -182,7 +186,7 @@ export async function createEvent(input: CreateEventInput) {
  * Update an event by slug
  * ----------------------------------------*/
 export async function updateEventBySlug(slug: string, input: UpdateEventInput) {
-  const existing = await getEventBySlug(slug);
+  const existing = await getEventBySlug(slug, { includeUnpublished: true });
   if (!existing) {
     throw new Error('EVENT_NOT_FOUND');
   }
@@ -242,7 +246,12 @@ export async function updateEventBySlug(slug: string, input: UpdateEventInput) {
 /* ------------------------------------------
  * Get an event by slug
  * ----------------------------------------*/
-export async function getEventBySlug(slug: string): Promise<EventDetail | null> {
+export async function getEventBySlug(
+  slug: string,
+  options: { includeUnpublished?: boolean } = {},
+): Promise<EventDetail | null> {
+  const includeUnpublished = options.includeUnpublished ?? false;
+
   const result = await pool.query<EventDetail>(
     `
     SELECT
@@ -258,6 +267,7 @@ export async function getEventBySlug(slug: string): Promise<EventDetail | null> 
       ends_at
     FROM events
     WHERE slug = $1
+      ${includeUnpublished ? '' : 'AND published = TRUE'}
     `,
     [slug],
   );

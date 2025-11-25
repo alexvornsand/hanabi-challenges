@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Navigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { postJsonAuth, ApiError, getJson, putJsonAuth } from '../../lib/api';
+import { postJsonAuth, ApiError, getJson, putJsonAuth, getJsonAuth } from '../../lib/api';
 
 type StepKey = 'event' | 'stage' | 'templates' | 'registration';
 
@@ -41,6 +41,7 @@ export function AdminCreateEventPage() {
   const [stageAbbr, setStageAbbr] = useState('');
   const [stageGameCount, setStageGameCount] = useState(100);
   const [stageIndex] = useState(1);
+  const [stageTimeBound, setStageTimeBound] = useState(true);
 
   const [variant, setVariant] = useState('No Variant');
   const [seedCount, setSeedCount] = useState(100);
@@ -98,14 +99,21 @@ const [currentStep, setCurrentStep] = useState<StepKey>('event');
     const load = async () => {
       setLoadingExisting(true);
       setError(null);
+      if (!token) {
+        setError('Missing auth token');
+        setLoadingExisting(false);
+        return;
+      }
       try {
-        const event = await getJson<EventDetail>(`/events/${editSlug}`);
+        const event = await getJsonAuth<EventDetail>(`/events/${editSlug}`, token);
         setName(event.name);
         setSlug(event.slug);
         setShortDescription(event.short_description || '');
         setLongDescription(event.long_description || '');
-        setStartsAt(event.starts_at ? event.starts_at.slice(0, 10) : '');
-        setEndsAt(event.ends_at ? event.ends_at.slice(0, 10) : '');
+        const evStart = event.starts_at ? event.starts_at.slice(0, 10) : '';
+        const evEnd = event.ends_at ? event.ends_at.slice(0, 10) : '';
+        setStartsAt(evStart);
+        setEndsAt(evEnd);
         setPublished(event.published ?? false);
         setAllowLateRegistration(event.allow_late_registration ?? true);
         setRegistrationCutoff(event.registration_cutoff ? event.registration_cutoff.slice(0, 10) : '');
@@ -120,6 +128,11 @@ const [currentStep, setCurrentStep] = useState<StepKey>('event');
           setEnforceExactTeamSize(!!enforce);
           if (evAbbr) setEventAbbr(evAbbr);
           setStageAbbr(stAbbr || evAbbr || '');
+          const stStart = st.starts_at ? st.starts_at.slice(0, 10) : '';
+          const stEnd = st.ends_at ? st.ends_at.slice(0, 10) : '';
+          setStartsAt(stStart);
+          setEndsAt(stEnd);
+          setStageTimeBound(Boolean(stStart || stEnd));
         }
 
         const templates = await getJson<EventGameTemplate[]>(`/events/${editSlug}/game-templates`);
@@ -134,7 +147,7 @@ const [currentStep, setCurrentStep] = useState<StepKey>('event');
       }
     };
     load();
-  }, [isEdit, editSlug]);
+  }, [isEdit, editSlug, token]);
 
   const seedPreview = useMemo(() => {
     const seeds = buildSeedsFromFormula(seedFormula, eventAbbr, stageAbbr, seedCount);
@@ -150,7 +163,7 @@ const [currentStep, setCurrentStep] = useState<StepKey>('event');
     !!stageAbbr &&
     !stageAbbrHasSpace &&
     stageGameCount > 0 &&
-    datesValid(startsAt, endsAt);
+    (stageTimeBound ? datesValid(startsAt, endsAt) : true);
   const templatesValid = !!variant && seedCount >= 1 && !!seedFormula.trim() && !formulaHasSpace;
   const registrationValid = true;
 
@@ -198,8 +211,8 @@ const [currentStep, setCurrentStep] = useState<StepKey>('event');
           stage_index: 1,
           label: stageLabel || name,
           stage_type: 'SINGLE',
-          starts_at: startsAt || null,
-          ends_at: endsAt ? `${endsAt}T23:59:59Z` : null,
+          starts_at: stageTimeBound && startsAt ? `${startsAt}T00:00:00Z` : null,
+          ends_at: stageTimeBound && endsAt ? `${endsAt}T23:59:59Z` : null,
           config_json: {
             event_abbreviation: eventAbbr || null,
             stage_abbreviation: stageAbbr || null,
@@ -499,7 +512,44 @@ const [currentStep, setCurrentStep] = useState<StepKey>('event');
           </div>
         </div>
 
-        <div className="grid gap-3 md:grid-cols-2">
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '0.2fr 0.4fr 0.4fr',
+            gap: '12px',
+            alignItems: 'start',
+          }}
+        >
+          <div className="stack-xs">
+            <label
+              className="text-sm font-medium text-gray-700"
+              htmlFor="stageTimeBound"
+              style={{ display: 'block', marginBottom: '4px' }}
+            >
+              Time bound
+            </label>
+            <button
+              type="button"
+              onClick={() => setStageTimeBound((v) => !v)}
+              aria-pressed={stageTimeBound}
+              className="flex items-center justify-center"
+              style={{
+                width: '32px',
+                height: '32px',
+                border: '1px solid var(--color-border)',
+                borderRadius: 'var(--radius-sm)',
+                background: stageTimeBound ? 'var(--color-accent-weak)' : 'var(--color-surface)',
+                cursor: 'pointer',
+              }}
+            >
+              {stageTimeBound && (
+                <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: '18px' }}>
+                  check
+                </span>
+              )}
+              {!stageTimeBound && <span aria-hidden="true" style={{ width: '18px', height: '18px' }} />}
+            </button>
+          </div>
           <div className="stack-xs">
             <label className="text-sm font-medium text-gray-700">Stage Starts</label>
             <input
@@ -507,6 +557,7 @@ const [currentStep, setCurrentStep] = useState<StepKey>('event');
               className="input"
               value={startsAt}
               onChange={(e) => setStartsAt(e.target.value)}
+              disabled={!stageTimeBound}
             />
           </div>
           <div className="stack-xs">
@@ -516,6 +567,7 @@ const [currentStep, setCurrentStep] = useState<StepKey>('event');
               className="input"
               value={endsAt}
               onChange={(e) => setEndsAt(e.target.value)}
+              disabled={!stageTimeBound}
             />
           </div>
         </div>

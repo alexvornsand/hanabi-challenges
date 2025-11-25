@@ -4,7 +4,7 @@ import { useEvents } from '../hooks/useEvents';
 import { useAuth } from '../context/AuthContext';
 
 function formatDateRange(startsAt: string | null, endsAt: string | null) {
-  if (!startsAt && !endsAt) return 'Dates TBD';
+  if (!startsAt && !endsAt) return null;
 
   const start = startsAt ? new Date(startsAt) : null;
   const end = endsAt ? new Date(endsAt) : null;
@@ -14,7 +14,7 @@ function formatDateRange(startsAt: string | null, endsAt: string | null) {
   }
   if (start) return `Starts ${start.toLocaleDateString()}`;
   if (end) return `Ends ${end.toLocaleDateString()}`;
-  return 'Dates TBD';
+  return null;
 }
 
 export const EventArchivePage: React.FC = () => {
@@ -96,9 +96,11 @@ export const EventArchivePage: React.FC = () => {
                       Unpublished
                     </span>
                   )}
-                  <span className="pill pill--accent text-sm whitespace-nowrap">
-                    {formatDateRange(event.starts_at, event.ends_at)}
-                  </span>
+                  {formatDateRange(event.starts_at, event.ends_at) && (
+                    <span className="pill pill--accent text-sm whitespace-nowrap">
+                      {formatDateRange(event.starts_at, event.ends_at)}
+                    </span>
+                  )}
                   {user && (user.role === 'ADMIN' || user.role === 'SUPERADMIN') && (
                     <Link
                       to={`/admin/events/${event.slug}/edit`}

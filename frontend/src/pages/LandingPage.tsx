@@ -3,13 +3,13 @@ import { Link } from 'react-router-dom';
 import { useEvents } from '../hooks/useEvents';
 
 function formatDateRange(startsAt: string | null, endsAt: string | null) {
-  if (!startsAt && !endsAt) return 'Dates TBD';
+  if (!startsAt && !endsAt) return null;
   const start = startsAt ? new Date(startsAt) : null;
   const end = endsAt ? new Date(endsAt) : null;
   if (start && end) return `${start.toLocaleDateString()} — ${end.toLocaleDateString()}`;
   if (start) return `Starts ${start.toLocaleDateString()}`;
   if (end) return `Ends ${end.toLocaleDateString()}`;
-  return 'Dates TBD';
+  return null;
 }
 
 export const LandingPage: React.FC = () => {
@@ -20,6 +20,8 @@ export const LandingPage: React.FC = () => {
       events.filter((e) => {
         const start = e.starts_at ? new Date(e.starts_at).getTime() : null;
         const end = e.ends_at ? new Date(e.ends_at).getTime() : null;
+        // Skip events with no time bounds
+        if (!start && !end) return false;
         if (start && start > now) return false; // future, not started
         if (end && end < now) return false; // already ended
         return true;
@@ -85,12 +87,14 @@ export const LandingPage: React.FC = () => {
                     {event.name}
                   </Link>
                 </h2>
-                <span
-                  className="pill pill--accent text-sm whitespace-nowrap"
-                  style={{ position: 'absolute', top: '12px', right: '12px' }}
-                >
-                  {formatDateRange(event.starts_at, event.ends_at)}
-                </span>
+                {formatDateRange(event.starts_at, event.ends_at) && (
+                  <span
+                    className="pill pill--accent text-sm whitespace-nowrap"
+                    style={{ position: 'absolute', top: '12px', right: '12px' }}
+                  >
+                    {formatDateRange(event.starts_at, event.ends_at)}
+                  </span>
+                )}
                 <div
                   className="text-sm text-gray-700"
                   style={{ whiteSpace: 'pre-line' }}
