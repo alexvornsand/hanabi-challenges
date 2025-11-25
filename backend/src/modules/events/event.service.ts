@@ -240,8 +240,30 @@ export async function listEventTeams(eventId: number): Promise<EventTeam[]> {
       t.event_id,
       t.name,
       t.created_at,
-      t.team_size
+      t.team_size,
+      stats.completed_games,
+      stats.perfect_games,
+      stats.avg_bdr,
+      stats.avg_score,
+      totals.total_templates
     FROM event_teams t
+    LEFT JOIN (
+      SELECT
+        g.event_team_id,
+        COUNT(g.id) AS completed_games,
+        COUNT(*) FILTER (WHERE g.score = egt.max_score) AS perfect_games,
+        AVG(g.bottom_deck_risk)::decimal AS avg_bdr,
+        AVG(g.score)::decimal AS avg_score
+      FROM event_games g
+      JOIN event_game_templates egt ON egt.id = g.event_game_template_id
+      GROUP BY g.event_team_id
+    ) stats ON stats.event_team_id = t.id
+    LEFT JOIN LATERAL (
+      SELECT COUNT(*) AS total_templates
+      FROM event_game_templates egt
+      JOIN event_stages es ON es.event_stage_id = egt.event_stage_id
+      WHERE es.event_id = t.event_id
+    ) totals ON TRUE
     WHERE t.event_id = $1
     ORDER BY t.id;
     `,

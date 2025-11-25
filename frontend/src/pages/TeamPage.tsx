@@ -49,6 +49,30 @@ export function TeamPage() {
   }, [members]);
 
   const games = useMemo(() => (Array.isArray(data?.games) ? data.games : []), [data]);
+  const stats = useMemo(() => {
+    const totalTemplates = templates.length;
+    const completed = templates.filter((t) => t.result).length;
+    const totalScore = templates.reduce((sum, t) => sum + (t.result?.score ?? 0), 0);
+    const maxScoreTotal = templates.reduce((sum, t) => sum + (t.max_score ?? 25), 0);
+    const winCount = templates.filter(
+      (t) => t.result && t.max_score != null && t.result.score === t.max_score,
+    ).length;
+    const avgScore = completed > 0 ? totalScore / completed : null;
+    const avgBdrCount = templates.filter((t) => t.result && t.result.bottom_deck_risk != null);
+    const avgBdr =
+      avgBdrCount.length > 0
+        ? avgBdrCount.reduce((sum, t) => sum + (t.result!.bottom_deck_risk ?? 0), 0) /
+          avgBdrCount.length
+        : null;
+    return {
+      totalTemplates,
+      completed,
+      percentMax: maxScoreTotal > 0 ? totalScore / maxScoreTotal : null,
+      winRate: completed > 0 ? winCount / completed : null,
+      avgScore,
+      avgBdr,
+    };
+  }, [templates]);
 
   const templateStages = groupTemplatesByStage(templates ?? []);
   const gameByTemplateId = useMemo(() => {
@@ -56,6 +80,15 @@ export function TeamPage() {
     games.forEach((g) => map.set(g.event_game_template_id, g));
     return map;
   }, [games]);
+  const collapsedMap = useMemo(() => {
+    const defaults: Record<string, boolean> = {};
+    templateStages.forEach((stage) => {
+      if (stage.stage_status === 'in_progress') defaults[stage.stage_label] = false;
+      if (stage.stage_status === 'complete') defaults[stage.stage_label] = true;
+    });
+    return defaults;
+  }, [templateStages]);
+  const [collapsedOverrides, setCollapsedOverrides] = useState<Record<string, boolean>>({});
 
   if (!parsedTeamId || notFound) {
     return <NotFoundPage />;
@@ -63,7 +96,7 @@ export function TeamPage() {
 
   if (loading) {
     return (
-      <main className="p-4">
+      <main className="page">
         <p>Loading team...</p>
       </main>
     );
@@ -71,7 +104,7 @@ export function TeamPage() {
 
   if (error) {
     return (
-      <main className="p-4">
+      <main className="page">
         <h1 className="text-xl font-semibold mb-2">Team</h1>
         <p className="text-red-600">{error}</p>
       </main>
@@ -88,43 +121,81 @@ export function TeamPage() {
   }
 
   return (
-    <main className="p-4 space-y-6">
-      <header className="space-y-2">
+    <main className="page">
+      <header className="stack-sm">
         <p className="text-sm text-gray-600">
           <Link to={`/events/${data.team.event_slug}`} className="text-blue-700">
             {data.team.event_name}
           </Link>{' '}
           · Team
         </p>
-        <h1 className="text-2xl font-bold">{data.team.name}</h1>
-        <p className="text-gray-700">
-          Player count: {data.team.team_size} · Team ID: <code>{data.team.id}</code>
-        </p>
+        <div className="flex items-center gap-3 flex-wrap">
+          <h1 className="text-2xl font-bold">{data.team.name}</h1>
+          <span className="pill pill--accent text-sm">
+            {data.team.team_size}-Player Team
+          </span>
+        </div>
       </header>
 
-      <section className="space-y-2">
-        <h2 className="text-xl font-semibold">Roster</h2>
-        {data.members.length === 0 ? (
-          <p className="text-gray-600">No members listed yet.</p>
-        ) : (
-          <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {data.members.map((member) => (
-              <li
-                key={member.id}
-                className="border rounded-md px-3 py-2 bg-white/70 backdrop-blur-sm flex items-center justify-between"
-              >
+      <section
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 2fr',
+          gap: 'var(--space-md)',
+          alignItems: 'stretch',
+        }}
+      >
+        <div className="card stack-sm" style={{ height: '100%' }}>
+          <h2 className="text-xl font-semibold">Roster</h2>
+          {data.members.length === 0 ? (
+            <p className="text-gray-600">No members listed yet.</p>
+          ) : (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-xs)' }}>
+              {data.members.map((member) => (
                 <UserPill
+                  key={member.id}
                   name={member.display_name}
                   color={member.color_hex}
                   textColor={member.text_color}
                 />
-              </li>
-            ))}
-          </ul>
-        )}
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="card stack-sm" style={{ height: '100%' }}>
+          <h2 className="text-xl font-semibold">Performance</h2>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+              gridTemplateRows: 'repeat(2, minmax(0, 1fr))',
+              gap: 'var(--space-sm)',
+            }}
+          >
+            <div className="card stack-sm kpi-card">
+              <span className="kpi-label">Games Completed</span>
+              <div className="kpi-value">{stats.completed} / {stats.totalTemplates}</div>
+            </div>
+            <div className="card stack-sm kpi-card">
+              <span className="kpi-label">Win Rate</span>
+              <div className="kpi-value">
+                {stats.winRate != null ? `${Math.round(stats.winRate * 100)}%` : '—'}
+              </div>
+            </div>
+            <div className="card stack-sm kpi-card">
+              <span className="kpi-label">Avg BDR</span>
+              <div className="kpi-value">{stats.avgBdr != null ? stats.avgBdr.toFixed(2) : '—'}</div>
+            </div>
+            <div className="card stack-sm kpi-card">
+              <span className="kpi-label">Avg Score</span>
+              <div className="kpi-value">{stats.avgScore != null ? stats.avgScore.toFixed(2) : '—'}</div>
+            </div>
+            <div className="card" style={{ gridColumn: 3, gridRow: '1 / span 2', minHeight: '180px' }} />
+          </div>
+        </div>
       </section>
 
-      <section className="space-y-3">
+      <section className="stack-sm">
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-semibold">Games</h2>
           {templatesLoading && <p className="text-sm text-gray-600">Loading games…</p>}
@@ -132,74 +203,120 @@ export function TeamPage() {
         {templatesError && <p className="text-red-600">{templatesError}</p>}
         {!templatesLoading && templates.length === 0 && <p className="text-gray-600">No games found.</p>}
         {!templatesLoading && templates.length > 0 && (
-          <div className="space-y-4">
+          <div className="stack">
             {templateStages.map((stage) => (
-              <div key={stage.stage_label} className="border rounded-lg overflow-hidden">
-                <div className="px-3 py-2 bg-gray-50 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-semibold">{stage.stage_label}</span>
-                    <span className="text-xs text-gray-600 uppercase tracking-wide">{stage.stage_type}</span>
-                  </div>
-                </div>
-                <table className="w-full border-collapse">
-                  <thead>
-                    <tr className="bg-gray-100 text-left text-sm">
-                      <th className="px-3 py-2">Index</th>
-                      <th className="px-3 py-2">Variant</th>
-                      <th className="px-3 py-2">Score</th>
-                      <th className="px-3 py-2">Failure reason</th>
-                      <th className="px-3 py-2">BDR</th>
-                      <th className="px-3 py-2">Players</th>
-                      <th className="px-3 py-2">Date</th>
-                      <th className="px-3 py-2">Game ID</th>
-                      <th className="px-3 py-2">Notes</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {stage.templates.map((tpl) =>
-                      tpl.result ? (
-                        <PlayedRow
-                          key={tpl.template_id}
-                          template={tpl}
-                          fallbackGame={gameByTemplateId.get(tpl.template_id)}
-                        />
-                      ) : (
-                        <UnplayedRow
-                          key={tpl.template_id}
-                          template={tpl}
-                          draft={
-                            drafts[tpl.template_id] ?? {
-                              replay: '',
-                              bdr: '',
-                              notes: '',
-                              replayError: null,
-                              replayGameId: null,
-                              validateStatus: 'idle',
-                              validateMessage: null,
-                              derivedScore: null,
-                              derivedEndCondition: null,
-                              derivedPlayers: [],
-                              derivedPlayedAt: null,
-                              derivedEndConditionCode: null,
-                              validationRaw: null,
+              <div key={stage.stage_label} className="card" style={{ padding: 0 }}>
+                {(() => {
+                  const played = stage.templates.filter((t) => Boolean(t.result)).length;
+                  const perfect = stage.templates.filter(
+                    (t) => t.result && t.max_score != null && t.result.score === t.max_score,
+                  ).length;
+                  const baseCollapsed = collapsedMap[stage.stage_label];
+                  const isCollapsed =
+                    collapsedOverrides[stage.stage_label] ?? baseCollapsed ?? false;
+                  return (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setCollapsedOverrides((prev) => ({
+                          ...prev,
+                          [stage.stage_label]: !isCollapsed,
+                        }))
+                      }
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        border: 'none',
+                        width: '100%',
+                        textAlign: 'left',
+                        background: 'var(--color-surface-muted)',
+                        padding: '4px var(--space-sm)',
+                        gap: 'var(--space-sm)',
+                        borderBottom: '1px solid var(--color-border)',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <div style={{ minWidth: 0, overflow: 'hidden' }}>
+                        <h3
+                          className="text-base font-semibold"
+                          style={{
+                            margin: 0,
+                            whiteSpace: 'nowrap',
+                            textOverflow: 'ellipsis',
+                            overflow: 'hidden',
+                          }}
+                        >
+                          {stage.stage_label}
+                        </h3>
+                      </div>
+                      <div style={{ flexShrink: 0, whiteSpace: 'nowrap' }} className="text-sm text-gray-600">
+                        {perfect} / {played}
+                      </div>
+                    </button>
+                  );
+                })()}
+                {! (collapsedOverrides[stage.stage_label] ?? collapsedMap[stage.stage_label] ?? false) && (
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Index</th>
+                        <th>Variant</th>
+                        <th className="text-right">Score</th>
+                        <th>Outcome</th>
+                        <th className="text-right">BDR</th>
+                        <th>Players</th>
+                        <th>Date</th>
+                        <th>Game ID</th>
+                        <th>Notes</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {stage.templates.map((tpl) =>
+                        tpl.result ? (
+                          <PlayedRow
+                            key={tpl.template_id}
+                            template={tpl}
+                            fallbackGame={gameByTemplateId.get(tpl.template_id)}
+                          />
+                        ) : (
+                          <UnplayedRow
+                            key={tpl.template_id}
+                            template={tpl}
+                            draft={
+                              drafts[tpl.template_id] ?? {
+                                replay: '',
+                                bdr: '',
+                                notes: '',
+                                replayError: null,
+                                replayGameId: null,
+                                validateStatus: 'idle',
+                                validateMessage: null,
+                                derivedScore: null,
+                                derivedEndCondition: null,
+                                derivedPlayers: [],
+                                derivedPlayedAt: null,
+                                derivedEndConditionCode: null,
+                                validationRaw: null,
+                              }
                             }
-                          }
-                          teamSize={data.team.team_size}
-                          tablePassword={data.team.table_password ?? undefined}
-                          showCreateLink={isMember}
-                          slug={slug ?? ''}
-                          teamId={data.team.id}
-                          token={token ?? undefined}
-                          memberColors={memberColorMap}
-                          editable={isMember}
-                          onDraftChange={(next) =>
-                            setDrafts((prev) => ({ ...prev, [tpl.template_id]: next }))
-                          }
-                        />
-                      ),
-                    )}
-                  </tbody>
-                </table>
+                            teamSize={data.team.team_size}
+                            tablePassword={data.team.table_password ?? undefined}
+                            showCreateLink={isMember}
+                            slug={slug ?? ''}
+                            teamId={data.team.id}
+                            token={token ?? undefined}
+                            memberColors={memberColorMap}
+                            editable={isMember}
+                            onDraftChange={(next) =>
+                              setDrafts((prev) => ({ ...prev, [tpl.template_id]: next }))
+                            }
+                          />
+                        ),
+                      )}
+                    </tbody>
+                  </table>
+                )}
               </div>
             ))}
           </div>
@@ -287,29 +404,29 @@ function mapEndCondition(code: number | null): string | null {
 function StatusIcon({ draft }: { draft: { validateStatus?: 'idle' | 'loading' | 'ok' | 'error'; validateMessage?: string | null; replayError?: string | null } }) {
   if (draft.replayError) {
     return (
-      <span role="img" aria-label="error" title={draft.replayError}>
-        ❗
+      <span className="material-symbols-outlined" aria-label="error" title={draft.replayError}>
+        &#xe000;
       </span>
     );
   }
   if (draft.validateStatus === 'loading') {
     return (
-      <span role="img" aria-label="loading" title="Validating replay…">
-        ⏳
+      <span className="material-symbols-outlined" aria-label="loading" title="Validating replay…">
+        &#xea5b;
       </span>
     );
   }
   if (draft.validateStatus === 'ok') {
     return (
-      <span role="img" aria-label="ok" title={draft.validateMessage ?? 'Valid replay'}>
-        ✅
+      <span className="material-symbols-outlined" aria-label="ok" title={draft.validateMessage ?? 'Valid replay'}>
+        &#xe86c;
       </span>
     );
   }
   if (draft.validateStatus === 'error') {
     return (
-      <span role="img" aria-label="error" title={draft.validateMessage ?? 'Validation failed'}>
-        ❗
+      <span className="material-symbols-outlined" aria-label="error" title={draft.validateMessage ?? 'Validation failed'}>
+        &#xe000;
       </span>
     );
   }
@@ -319,21 +436,52 @@ function StatusIcon({ draft }: { draft: { validateStatus?: 'idle' | 'loading' | 
 function groupTemplatesByStage(templates: TeamTemplate[]) {
   const map = new Map<
     string,
-    { stage_label: string; stage_type: string; stage_index: number; templates: TeamTemplate[] }
+    {
+      stage_label: string;
+      stage_type: string;
+      stage_index: number;
+      stage_status?: string | null;
+      templates: TeamTemplate[];
+      stats?: { games_played: number; perfect_games: number };
+    }
   >();
   templates.forEach((tpl) => {
     const key = `${tpl.stage_index}-${tpl.stage_label}`;
+    if (tpl.stage_status === 'not_started') {
+      return;
+    }
     if (!map.has(key)) {
       map.set(key, {
         stage_label: tpl.stage_label,
         stage_type: tpl.stage_type,
         stage_index: tpl.stage_index,
+        stage_status: tpl.stage_status,
         templates: [],
+        stats: tpl.stats,
       });
+    }
+    // keep stats if provided on this template
+    const existing = map.get(key);
+    if (!existing?.stats && tpl.stats) {
+      map.get(key)!.stats = tpl.stats;
     }
     map.get(key)!.templates.push(tpl);
   });
-  return Array.from(map.values()).sort((a, b) => a.stage_index - b.stage_index);
+  return Array.from(map.values()).sort((a, b) => {
+    const rank = (s?: string | null) => (s === 'in_progress' ? 0 : s === 'complete' ? 1 : 2);
+    const ra = rank(a.stage_status);
+    const rb = rank(b.stage_status);
+    if (ra !== rb) return ra - rb;
+    if (ra === 0) {
+      // in progress ascending
+      return a.stage_index - b.stage_index;
+    }
+    if (ra === 1) {
+      // complete descending
+      return b.stage_index - a.stage_index;
+    }
+    return a.stage_index - b.stage_index;
+  });
 }
 
 function PlayedRow({ template, fallbackGame }: { template: TeamTemplate; fallbackGame?: TeamGame }) {
@@ -353,20 +501,20 @@ function PlayedRow({ template, fallbackGame }: { template: TeamTemplate; fallbac
     <tr className="border-t">
       <td className="px-3 py-2 text-sm">{template.template_index}</td>
       <td className="px-3 py-2 text-sm">{template.variant}</td>
-      <td className="px-3 py-2 text-sm">{score}</td>
+      <td className="px-3 py-2 text-sm text-right">{score}</td>
       <td className="px-3 py-2 text-sm">{reason || 'Normal'}</td>
-      <td className="px-3 py-2 text-sm">{r.bottom_deck_risk ?? ''}</td>
-      <td className="px-3 py-2 text-sm">
-        {players.length > 0 ? (
-          <div className="flex flex-wrap gap-1">
-            {players.map((p) => (
-              <UserPill key={p.display_name} name={p.display_name} color={p.color_hex} textColor={p.text_color} />
-            ))}
-          </div>
-        ) : (
-          <span className="text-gray-500">—</span>
-        )}
-      </td>
+      <td className="px-3 py-2 text-sm text-right">{r.bottom_deck_risk ?? ''}</td>
+                      <td className="px-3 py-2 text-sm">
+                        {players.length > 0 ? (
+                          <div className="pill-row">
+                            {players.map((p) => (
+                              <UserPill key={p.display_name} name={p.display_name} color={p.color_hex} textColor={p.text_color} />
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-gray-500">—</span>
+                        )}
+                      </td>
       <td className="px-3 py-2 text-sm">{playedAt ? playedAt.toLocaleDateString() : ''}</td>
       <td className="px-3 py-2 text-sm">
         {r.hanab_game_id ? (
@@ -384,8 +532,8 @@ function PlayedRow({ template, fallbackGame }: { template: TeamTemplate; fallbac
       </td>
       <td className="px-3 py-2 text-sm">
         {r.notes && (
-          <span role="img" aria-label="Notes" title={r.notes}>
-            📝
+          <span className="material-symbols-outlined" aria-label="Notes" title={r.notes}>
+            note
           </span>
         )}
       </td>
@@ -666,27 +814,28 @@ function UnplayedRow({
           )}
         </td>
       <td className="px-3 py-2 text-sm">{template.variant}</td>
-      <td className="px-3 py-2 text-sm">
-        {draft.derivedScore != null ? draft.derivedScore : <span className="text-gray-500">—</span>}
+      <td className="px-3 py-2 text-sm text-right">
+        {draft.derivedScore != null ? draft.derivedScore : ''}
       </td>
       <td className="px-3 py-2 text-sm">
-        {draft.derivedEndCondition ? draft.derivedEndCondition : <span className="text-gray-500">—</span>}
+        {draft.derivedEndCondition ? draft.derivedEndCondition : ''}
       </td>
-      <td className="px-3 py-2 text-sm">
+      <td className="px-3 py-2 text-sm text-right">
         {editable ? (
           <input
-            className="w-20 border rounded px-2 py-1 text-sm"
+            className="input"
+            style={{ width: '72px' }}
             placeholder="BDR"
             value={draft.bdr}
             onChange={(e) => update({ bdr: e.target.value })}
           />
         ) : (
-          <span className="text-gray-500">—</span>
+          ''
         )}
       </td>
       <td className="px-3 py-2 text-sm">
         {draft.derivedPlayers && draft.derivedPlayers.length > 0 ? (
-          <div className="flex flex-wrap gap-1">
+          <div className="pill-row">
             {draft.derivedPlayers.map((p) => (
               <UserPill
                 key={p}
@@ -697,51 +846,51 @@ function UnplayedRow({
             ))}
           </div>
         ) : (
-          <span className="text-gray-500">—</span>
+          ''
         )}
       </td>
       <td className="px-3 py-2 text-sm">
-        {draft.derivedPlayedAt ? (
-          <span>{new Date(draft.derivedPlayedAt).toLocaleDateString()}</span>
-        ) : (
-          <span className="text-gray-500">—</span>
-        )}
+        {draft.derivedPlayedAt ? <span>{new Date(draft.derivedPlayedAt).toLocaleDateString()}</span> : ''}
       </td>
       <td className="px-3 py-2 text-sm">
           {editable ? (
-            <div className="flex items-center gap-2">
+            <div style={{ display: 'grid', gridTemplateColumns: 'auto auto auto', alignItems: 'center', gap: '10px' }}>
               <input
-                className="w-full border rounded px-2 py-1 text-sm"
-                placeholder="Game ID or replay URL"
+              className="input"
+              style={{ maxWidth: '150px', minWidth: '120px' }}
+              placeholder="Game ID or URL"
                 value={draft.replay}
-                onChange={(e) => validateReplay(e.target.value)}
-              />
-              <StatusIcon draft={draft} />
-              <button
-                className="px-3 py-1 rounded bg-blue-600 text-white text-sm font-semibold disabled:opacity-60"
-                disabled={
-                  !draft.replayGameId ||
-                  Boolean(draft.replayError) ||
+              onChange={(e) => validateReplay(e.target.value)}
+            />
+            <StatusIcon draft={draft} />
+            <button
+              className="btn btn--primary btn--sm"
+              disabled={
+                !draft.replayGameId ||
+                Boolean(draft.replayError) ||
                   draft.validateStatus !== 'ok' ||
                   submitting
                 }
                 onClick={handleSubmit}
+                aria-label="Submit"
               >
-                {submitting ? 'Submitting…' : 'Submit'}
+                <span className="material-symbols-outlined" aria-hidden="true">
+                  &#xe941;
+                </span>
               </button>
             </div>
           ) : (
-            <span className="text-gray-500">—</span>
+            ''
           )}
       </td>
-      <td className="px-3 py-2 text-sm text-gray-500">—</td>
+      <td className="px-3 py-2 text-sm text-gray-500"></td>
       </tr>
       {showNotes && (
         <tr className="border-t bg-gray-50">
           <td colSpan={9} className="px-3 py-2">
             <label className="block text-sm font-medium text-gray-700 mb-1">Notes (optional)</label>
             <textarea
-              className="w-full border rounded px-3 py-2 text-sm"
+              className="textarea"
               rows={Math.max(1, draft.notes.split('\n').length + 1)}
               placeholder="Add notes about this game"
               value={draft.notes}

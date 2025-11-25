@@ -5,10 +5,16 @@ export type TeamTemplate = {
   stage_index: number;
   stage_label: string;
   stage_type: string;
+  stage_status?: string | null;
   template_id: number;
   template_index: number;
   variant: string;
+  max_score: number | null;
   seed_payload: string | null;
+  stats?: {
+    games_played: number;
+    perfect_games: number;
+  };
   result: {
     id: number;
     score: number;

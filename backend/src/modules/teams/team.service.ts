@@ -68,10 +68,16 @@ export interface TeamTemplateWithResult {
   stage_index: number;
   stage_label: string;
   stage_type: EventStage['stage_type'];
+  stage_status?: string | null;
   template_id: number;
   template_index: number;
   variant: string;
+  max_score: number | null;
   seed_payload: string | null;
+  stats?: {
+    games_played: number;
+    perfect_games: number;
+  };
   result: {
     id: number;
     score: number;
@@ -406,9 +412,11 @@ export async function listTeamTemplatesWithResults(
       es.stage_index,
       es.label AS stage_label,
       es.stage_type,
+      st.status AS stage_status,
       egt.id AS template_id,
       egt.template_index,
       egt.variant,
+      egt.max_score,
       egt.seed_payload,
       g.id AS result_id,
       g.score,
@@ -417,6 +425,8 @@ export async function listTeamTemplatesWithResults(
       g.notes,
       g.played_at,
       g.game_id AS hanab_game_id,
+      ss.games_played,
+      ss.perfect_games,
       COALESCE(
         json_agg(
           json_build_object(
@@ -434,14 +444,27 @@ export async function listTeamTemplatesWithResults(
     LEFT JOIN event_games g ON g.event_game_template_id = egt.id AND g.event_team_id = t.id
     LEFT JOIN game_participants gp ON gp.event_game_id = g.id
     LEFT JOIN users u ON u.id = gp.user_id
+    LEFT JOIN event_stage_team_statuses st ON st.event_stage_id = es.event_stage_id AND st.event_team_id = t.id
+    LEFT JOIN (
+      SELECT
+        egt.event_stage_id,
+        g.event_team_id,
+        COUNT(g.id) AS games_played,
+        COUNT(*) FILTER (WHERE g.score = egt.max_score) AS perfect_games
+      FROM event_games g
+      JOIN event_game_templates egt ON egt.id = g.event_game_template_id
+      GROUP BY egt.event_stage_id, g.event_team_id
+    ) ss ON ss.event_stage_id = es.event_stage_id AND ss.event_team_id = t.id
     WHERE t.id = $1
     GROUP BY
       es.stage_index,
       es.label,
       es.stage_type,
+      st.status,
       egt.id,
       egt.template_index,
       egt.variant,
+      egt.max_score,
       egt.seed_payload,
       g.id,
       g.score,
@@ -449,7 +472,9 @@ export async function listTeamTemplatesWithResults(
       g.bottom_deck_risk,
       g.notes,
       g.played_at,
-      g.game_id
+      g.game_id,
+      ss.games_played,
+      ss.perfect_games
     ORDER BY es.stage_index, egt.template_index;
     `,
     [eventTeamId],
@@ -459,10 +484,16 @@ export async function listTeamTemplatesWithResults(
     stage_index: row.stage_index,
     stage_label: row.stage_label,
     stage_type: row.stage_type,
+    stage_status: row.stage_status,
     template_id: row.template_id,
     template_index: row.template_index,
     variant: row.variant,
+    max_score: row.max_score,
     seed_payload: row.seed_payload,
+    stats: {
+      games_played: row.games_played ?? 0,
+      perfect_games: row.perfect_games ?? 0,
+    },
     result: row.result_id
       ? {
           id: row.result_id,

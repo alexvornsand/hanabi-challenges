@@ -7,6 +7,11 @@ export type EventTeam = {
   name: string;
   created_at: string;
   team_size: number;
+  completed_games?: number | null;
+  perfect_games?: number | null;
+  avg_bdr?: number | null;
+  avg_score?: number | null;
+  total_templates?: number | null;
 };
 
 type State = {

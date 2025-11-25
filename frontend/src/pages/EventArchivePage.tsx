@@ -28,10 +28,10 @@ export const EventArchivePage: React.FC = () => {
   });
 
   return (
-    <main className="p-4 space-y-4">
-      <header>
+    <main className="page">
+      <header className="stack-sm">
         <h1 className="text-2xl font-bold">Events</h1>
-        <p className="text-gray-700 mt-1">All Hanabi events, past and present.</p>
+        <p className="text-gray-700">All Hanabi events, past and present.</p>
       </header>
 
       {loading && <p>Loading events...</p>}
@@ -45,14 +45,11 @@ export const EventArchivePage: React.FC = () => {
       {!loading && !error && events.length === 0 && <p>No events found yet.</p>}
 
       {!loading && !error && events.length > 0 && (
-        <div className="space-y-4">
+        <div className="stack">
           {sortedEvents.map((event) => {
             const description = event.long_description || event.short_description || 'No description provided.';
             return (
-              <div
-                key={event.id}
-                className="border rounded-md p-4 shadow-sm bg-white/70 backdrop-blur-sm space-y-2"
-              >
+              <div key={event.id} className="card stack-sm">
                 <div className="flex items-baseline gap-3">
                   <Link to={`/events/${event.slug}`} className="text-lg font-semibold text-blue-700 flex-1">
                     {event.name}

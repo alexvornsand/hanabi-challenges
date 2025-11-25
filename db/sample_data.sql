@@ -70,8 +70,8 @@ VALUES
 -- ================================
 INSERT INTO event_stages (event_id, stage_index, label, stage_type, starts_at, ends_at)
 VALUES
-  (1, 1, 'Main Stage', 'SINGLE', '2025-03-01T00:00:00Z', '2025-06-01T00:00:00Z'),
-  (2, 1, 'Main Stage', 'SINGLE', '2025-07-01T00:00:00Z', '2025-09-01T00:00:00Z');
+  (1, 1, 'Spring Circuit 2025', 'SINGLE', '2025-03-01T00:00:00Z', '2025-06-01T00:00:00Z'),
+  (2, 1, 'Summer Sprint 2025', 'SINGLE', '2025-07-01T00:00:00Z', '2025-09-01T00:00:00Z');
 
 -- event_stage_ids:
 -- 1 = Event 1 Stage 1
@@ -246,6 +246,57 @@ VALUES
 -- 4..6   -> Clue Crew games
 -- 7..9   -> Faded Signals games
 -- 10..11 -> Risky Fuses games
+
+-- ================================
+-- Event stage team statuses
+-- ================================
+-- Metadata fields align with backend upsert: percent_max_score, average_score, average_bdr, games_played, total_templates, total_score, total_max_score
+INSERT INTO event_stage_team_statuses (
+  event_stage_id,
+  event_team_id,
+  status,
+  completed_at,
+  metadata_json
+)
+VALUES
+  -- Event 1 stage 1 has 5 templates (max score per template = 25)
+  (1, 1, 'in_progress', NULL, jsonb_build_object(
+    'percent_max_score', 48.0 / 125.0,
+    'average_score', 48.0 / 3.0,
+    'average_bdr', (2 + 4 + 7)::decimal / 3,
+    'games_played', 3,
+    'total_templates', 5,
+    'total_score', 48,
+    'total_max_score', 125
+  )),
+  (1, 2, 'in_progress', NULL, jsonb_build_object(
+    'percent_max_score', 45.0 / 125.0,
+    'average_score', 45.0 / 3.0,
+    'average_bdr', (3 + 5 + 6)::decimal / 3,
+    'games_played', 3,
+    'total_templates', 5,
+    'total_score', 45,
+    'total_max_score', 125
+  )),
+  -- Event 2 stage 1 has 5 templates (max score per template = 25)
+  (2, 3, 'in_progress', NULL, jsonb_build_object(
+    'percent_max_score', 50.0 / 125.0,
+    'average_score', 50.0 / 3.0,
+    'average_bdr', (1 + 3 + 8)::decimal / 3,
+    'games_played', 3,
+    'total_templates', 5,
+    'total_score', 50,
+    'total_max_score', 125
+  )),
+  (2, 4, 'in_progress', NULL, jsonb_build_object(
+    'percent_max_score', 40.0 / 125.0,
+    'average_score', 40.0 / 2.0,
+    'average_bdr', (4 + 5)::decimal / 2,
+    'games_played', 2,
+    'total_templates', 5,
+    'total_score', 40,
+    'total_max_score', 125
+  ));
 
 
 -- ================================
