@@ -49,15 +49,38 @@ export const EventArchivePage: React.FC = () => {
           {sortedEvents.map((event) => {
             const description = event.long_description || event.short_description || 'No description provided.';
             return (
-              <div key={event.id} className="card stack-sm">
-                <div className="flex items-baseline gap-3">
-                  <Link to={`/events/${event.slug}`} className="text-lg font-semibold text-blue-700 flex-1">
+              <div key={event.id} className="card stack-sm" style={{ position: 'relative' }}>
+                <div
+                  className="flex items-center"
+                  style={{
+                    gap: 'var(--space-sm)',
+                    paddingRight: '140px',
+                  }}
+                >
+                  <Link
+                    to={`/events/${event.slug}`}
+                    className="text-lg font-semibold text-blue-700"
+                    style={{
+                      flex: '1 1 auto',
+                      minWidth: 0,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
                     {event.name}
                   </Link>
-                  <span className="text-sm text-gray-600 whitespace-nowrap ml-auto">
-                    {formatDateRange(event.starts_at, event.ends_at)}
-                  </span>
                 </div>
+                <span
+                  className="pill pill--accent text-sm whitespace-nowrap"
+                  style={{
+                    position: 'absolute',
+                    top: '12px',
+                    right: '12px',
+                  }}
+                >
+                  {formatDateRange(event.starts_at, event.ends_at)}
+                </span>
                 <p className="text-sm text-gray-700">{description}</p>
               </div>
             );
