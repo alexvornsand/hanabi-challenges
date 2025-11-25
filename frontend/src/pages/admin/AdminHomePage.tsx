@@ -9,24 +9,21 @@ export function AdminHomePage() {
   }
 
   return (
-    <main className="p-4 space-y-3">
-      <h1 className="text-2xl font-bold">Admin</h1>
-      <p className="text-gray-700">Choose a tool below.</p>
+    <main className="page stack-sm">
+      <header className="stack-sm">
+        <h1 className="text-2xl font-bold">Admin</h1>
+      </header>
 
-      <ul className="list-disc pl-5 space-y-2">
-        <li>
-          <Link className="text-blue-700 underline" to="/admin/create-event">
-            Create event
-          </Link>
-        </li>
+      <div className="stack-sm" style={{ maxWidth: '220px' }}>
+        <Link to="/admin/create-event" className="btn btn--primary">
+          Create Event
+        </Link>
         {user.role === 'SUPERADMIN' && (
-          <li>
-            <Link className="text-blue-700 underline" to="/admin/manage-users">
-              Manage users
-            </Link>
-          </li>
+          <Link to="/admin/manage-users" className="btn btn--primary">
+            Manage Users
+          </Link>
         )}
-      </ul>
+      </div>
     </main>
   );
 }
