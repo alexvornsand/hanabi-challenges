@@ -18,7 +18,7 @@ function formatDateRange(startsAt: string | null, endsAt: string | null) {
 }
 
 export const EventArchivePage: React.FC = () => {
-  const { events, loading, error } = useEvents();
+  const { events, loading, error } = useEvents({ includeUnpublishedForAdmin: true });
   const { user } = useAuth();
   const visibleEvents = user && (user.role === 'ADMIN' || user.role === 'SUPERADMIN')
     ? events

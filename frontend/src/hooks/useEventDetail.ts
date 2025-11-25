@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { getJson, ApiError } from '../lib/api';
+import { getJson, ApiError, getJsonAuth } from '../lib/api';
+import { useAuth } from '../context/AuthContext';
 
 export type EventDetail = {
   id: number;
@@ -23,6 +24,7 @@ type State = {
 };
 
 export function useEventDetail(slug: string | undefined) {
+  const { user, token } = useAuth();
   const [state, setState] = useState<State>(() =>
     !slug
       ? {
@@ -59,7 +61,20 @@ export function useEventDetail(slug: string | undefined) {
       try {
         // getJson will add /api → /api/events/:slug
         const encodedSlug = encodeURIComponent(slug as string);
-        const data = await getJson<EventDetail>(`/events/${encodedSlug}`);
+        const isAdmin = user && (user.role === 'ADMIN' || user.role === 'SUPERADMIN');
+        const shouldAuth = isAdmin && !!token;
+
+        let data: EventDetail;
+        if (shouldAuth) {
+          try {
+            data = await getJsonAuth<EventDetail>(`/events/${encodedSlug}`, token as string);
+          } catch (err) {
+            // If auth fails, fall back to public fetch
+            data = await getJson<EventDetail>(`/events/${encodedSlug}`);
+          }
+        } else {
+          data = await getJson<EventDetail>(`/events/${encodedSlug}`);
+        }
 
         if (!cancelled) {
           setState({
@@ -96,7 +111,7 @@ export function useEventDetail(slug: string | undefined) {
     return () => {
       cancelled = true;
     };
-  }, [slug]);
+  }, [slug, token, user]);
 
   return state;
 }

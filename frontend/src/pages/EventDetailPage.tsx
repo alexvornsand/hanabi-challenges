@@ -71,7 +71,14 @@ export function EventDetailPage() {
     <main className="page">
       <header className="card" style={{ padding: 'var(--space-md)' }}>
         <div className="stack-sm" style={{ flex: '1 1 auto' }}>
-          <h1 className="text-2xl font-bold" style={{ margin: 0 }}>{event.name}</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold" style={{ margin: 0 }}>{event.name}</h1>
+            {event.published === false && (
+              <span className="pill text-xs" style={{ background: 'var(--color-surface-muted)' }}>
+                Unpublished
+              </span>
+            )}
+          </div>
           {(startsAt || endsAt) && (
             <div className="inline items-center gap-2 text-sm text-gray-700">
               <span className="pill pill--accent">

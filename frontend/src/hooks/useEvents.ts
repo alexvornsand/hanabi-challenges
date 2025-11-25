@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { getJson, ApiError } from '../lib/api';
+import { getJson, ApiError, getJsonAuth } from '../lib/api';
+import { useAuth } from '../context/AuthContext';
 
 export type EventSummary = {
   id: number;
@@ -20,7 +21,13 @@ type State = {
   error: string | null;
 };
 
-export function useEvents() {
+type Options = {
+  includeUnpublishedForAdmin?: boolean;
+};
+
+export function useEvents(options: Options = {}) {
+  const { includeUnpublishedForAdmin = false } = options;
+  const { user, token } = useAuth();
   const [state, setState] = useState<State>({
     events: [],
     loading: true,
@@ -33,8 +40,21 @@ export function useEvents() {
     async function fetchEvents() {
       setState((prev) => ({ ...prev, loading: true, error: null }));
 
+      const isAdmin = user && (user.role === 'ADMIN' || user.role === 'SUPERADMIN');
+      const shouldAuth = includeUnpublishedForAdmin && isAdmin && !!token;
+
       try {
-        const data = await getJson<EventSummary[]>('/events');
+        let data: EventSummary[];
+        if (shouldAuth) {
+          try {
+            data = await getJsonAuth<EventSummary[]>('/events', token as string);
+          } catch (err) {
+            // If auth fails, fall back to public list
+            data = await getJson<EventSummary[]>('/events');
+          }
+        } else {
+          data = await getJson<EventSummary[]>('/events');
+        }
 
         if (!cancelled) {
           setState({
@@ -62,7 +82,7 @@ export function useEvents() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [includeUnpublishedForAdmin, token, user]);
 
   return state;
 }
