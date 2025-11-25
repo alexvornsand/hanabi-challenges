@@ -38,6 +38,9 @@ CREATE TABLE events (
   name TEXT NOT NULL UNIQUE,
   short_description TEXT,
   long_description TEXT NOT NULL,
+  published BOOLEAN NOT NULL DEFAULT FALSE,
+  allow_late_registration BOOLEAN NOT NULL DEFAULT TRUE,
+  registration_cutoff TIMESTAMPTZ,
   starts_at TIMESTAMPTZ,
   ends_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW()

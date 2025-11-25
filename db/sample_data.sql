@@ -39,6 +39,9 @@ INSERT INTO events (
   slug,
   short_description,
   long_description,
+  published,
+  allow_late_registration,
+  registration_cutoff,
   starts_at,
   ends_at
 )
@@ -48,6 +51,9 @@ VALUES
     'spring-circuit-2025',
     'Seasonal spring ladder',
     $$A seasonal circuit with mixed variants and rotating seeds.\nPlay clean, log your replays, and chase consistency across the whole stage.$$,
+    TRUE,
+    FALSE,
+    '2025-02-25T00:00:00Z',
     '2025-03-01T00:00:00Z',
     '2025-06-01T00:00:00Z'
   ),
@@ -56,6 +62,9 @@ VALUES
     'summer-sprint-2025',
     'Fast-paced sprint event',
     $$Short sprint focused on quick plays. Mix of variants with fixed seeds for fairness.$$,
+    FALSE,
+    FALSE,
+    '2025-06-25T00:00:00Z',
     '2025-07-01T00:00:00Z',
     '2025-09-01T00:00:00Z'
   );

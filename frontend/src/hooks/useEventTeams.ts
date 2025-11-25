@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { ApiError, getJson } from '../lib/api';
 
 export type EventTeam = {
@@ -27,39 +27,26 @@ export function useEventTeams(slug: string | undefined) {
       : { teams: [], loading: true, error: null },
   );
 
-  useEffect(() => {
+  const fetchTeams = useCallback(async () => {
     if (!slug) return;
+    setState((prev) => ({ ...prev, loading: true, error: null }));
 
-    let cancelled = false;
-    const currentSlug = slug; // narrow for TS
+    try {
+      const encodedSlug = encodeURIComponent(slug);
+      const data = await getJson<EventTeam[]>(`/events/${encodedSlug}/teams`);
+      setState({ teams: data, loading: false, error: null });
+    } catch (err) {
+      const message =
+        err instanceof ApiError ? 'Failed to load teams. Please try again.' : 'Unexpected error';
 
-    async function fetchTeams() {
-      setState({ teams: [], loading: true, error: null });
-
-      try {
-        const encodedSlug = encodeURIComponent(currentSlug);
-        const data = await getJson<EventTeam[]>(`/events/${encodedSlug}/teams`);
-
-        if (!cancelled) {
-          setState({ teams: data, loading: false, error: null });
-        }
-      } catch (err) {
-        if (cancelled) return;
-
-        const message =
-          err instanceof ApiError ? 'Failed to load teams. Please try again.' : 'Unexpected error';
-
-        console.error('Failed to load event teams', err);
-        setState({ teams: [], loading: false, error: message });
-      }
+      console.error('Failed to load event teams', err);
+      setState({ teams: [], loading: false, error: message });
     }
-
-    fetchTeams();
-
-    return () => {
-      cancelled = true;
-    };
   }, [slug]);
 
-  return state;
+  useEffect(() => {
+    fetchTeams();
+  }, [fetchTeams]);
+
+  return { ...state, refetch: fetchTeams };
 }

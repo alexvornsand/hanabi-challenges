@@ -9,6 +9,7 @@ import {
   listEventTeams,
   getEventBySlug,
   createEventStage,
+  updateEventBySlug,
 } from './event.service';
 import { pool } from '../../config/db';
 import { listTeamMembers } from '../teams/team.service';
@@ -474,7 +475,17 @@ function parseGameId(input: string | null | undefined): string | null {
  *  POST /api/events  (ADMIN)
  * ----------------------------------------*/
 router.post('/', authRequired, requireAdmin, async (req: Request, res: Response) => {
-  const { name, slug, short_description, long_description, starts_at, ends_at } = req.body;
+  const {
+    name,
+    slug,
+    short_description,
+    long_description,
+    starts_at,
+    ends_at,
+    published,
+    allow_late_registration,
+    registration_cutoff,
+  } = req.body;
 
   if (!name) return res.status(400).json({ error: 'name is required' });
   if (!slug) return res.status(400).json({ error: 'slug is required' });
@@ -496,6 +507,9 @@ router.post('/', authRequired, requireAdmin, async (req: Request, res: Response)
       slug,
       short_description: short_description ?? null,
       long_description,
+      published: published ?? false,
+      allow_late_registration: allow_late_registration ?? true,
+      registration_cutoff: registration_cutoff ?? null,
       starts_at: starts_at ?? null,
       ends_at: ends_at ?? null,
     });
@@ -509,6 +523,49 @@ router.post('/', authRequired, requireAdmin, async (req: Request, res: Response)
 
     console.error('Error creating event:', err);
     res.status(500).json({ error: 'Failed to create event' });
+  }
+});
+
+/* ------------------------------------------
+ *  PUT /api/events/:slug  (ADMIN)
+ * ----------------------------------------*/
+router.put('/:slug', authRequired, requireAdmin, async (req: Request, res: Response) => {
+  const { slug } = req.params;
+  const { name, new_slug, short_description, long_description, starts_at, ends_at, published } =
+    req.body;
+
+  if (starts_at && ends_at) {
+    const startDate = new Date(starts_at);
+    const endDate = new Date(ends_at);
+    if (!Number.isFinite(startDate.getTime()) || !Number.isFinite(endDate.getTime())) {
+      return res.status(400).json({ error: 'Invalid date format for starts_at or ends_at' });
+    }
+    if (endDate <= startDate) {
+      return res.status(400).json({ error: 'ends_at must be after starts_at' });
+    }
+  }
+
+  try {
+    const updated = await updateEventBySlug(slug, {
+      name,
+      slug: new_slug ?? undefined,
+      short_description: short_description ?? undefined,
+      long_description,
+      published,
+      starts_at: starts_at ?? undefined,
+      ends_at: ends_at ?? undefined,
+    });
+    res.json(updated);
+  } catch (err) {
+    const e = err as { code?: string; message?: string };
+    if (e?.message === 'EVENT_NOT_FOUND') {
+      return res.status(404).json({ error: 'Event not found' });
+    }
+    if (e?.code === 'EVENT_NAME_EXISTS' || e?.code === '23505') {
+      return res.status(409).json({ error: 'Event name or slug must be unique' });
+    }
+    console.error('Error updating event:', err);
+    res.status(500).json({ error: 'Failed to update event' });
   }
 });
 

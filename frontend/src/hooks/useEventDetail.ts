@@ -7,6 +7,9 @@ export type EventDetail = {
   slug: string;
   short_description: string | null;
   long_description: string | null;
+  published?: boolean;
+  allow_late_registration?: boolean;
+  registration_cutoff?: string | null;
   starts_at: string | null;
   ends_at: string | null;
   created_at?: string;

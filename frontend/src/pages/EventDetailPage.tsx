@@ -1,5 +1,5 @@
-import { useParams, Link } from 'react-router-dom';
-import { useMemo, useState } from 'react';
+import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
 import { NotFoundPage } from './NotFoundPage';
 import { useEventDetail } from '../hooks/useEventDetail';
 import { useEventTeams } from '../hooks/useEventTeams';
@@ -11,6 +11,7 @@ import { useEventMemberships } from '../hooks/useEventMemberships';
 
 export function EventDetailPage() {
   const { slug, teamSize } = useParams<{ slug: string; teamSize?: string }>();
+  const navigate = useNavigate();
   const auth = useAuth();
   const { users: directory } = useUserDirectory();
   const { memberships } = useEventMemberships(slug);
@@ -25,7 +26,12 @@ export function EventDetailPage() {
   })();
 
   const { event, loading, error, notFound } = useEventDetail(slug);
-  const { teams, loading: teamsLoading, error: teamsError } = useEventTeams(slug);
+  const {
+    teams,
+    loading: teamsLoading,
+    error: teamsError,
+    refetch: refetchTeams,
+  } = useEventTeams(slug);
   if (notFound) {
     return <NotFoundPage />;
   }
@@ -57,6 +63,10 @@ export function EventDetailPage() {
 
   const startsAt = event.starts_at ? new Date(event.starts_at) : null;
   const endsAt = event.ends_at ? new Date(event.ends_at) : null;
+  const cutoff = event.registration_cutoff ? new Date(event.registration_cutoff) : endsAt;
+  const now = new Date();
+  const registrationClosed =
+    (cutoff && now > cutoff) || (!event.allow_late_registration && cutoff && now > cutoff);
 
   return (
     <main className="page">
@@ -86,10 +96,13 @@ export function EventDetailPage() {
           className="btn btn--primary"
           style={{ position: 'absolute', top: 'var(--space-sm)', right: 'var(--space-sm)' }}
           onClick={() => {
+            if (registrationClosed) return;
             setRegisterMessage(null);
             setRegisterError(null);
             setShowRegister(true);
           }}
+          disabled={registrationClosed}
+          title={registrationClosed ? 'Registration for this event is closed' : undefined}
         >
           Register a Team
         </button>
@@ -177,19 +190,28 @@ export function EventDetailPage() {
         <RegisterModal
           eventSlug={event.slug}
           eventName={event.name}
+          refetchTeams={refetchTeams}
           auth={auth}
           directory={directory}
           memberships={memberships}
-          onClose={() => setShowRegister(false)}
-          onSuccess={(msg) => setRegisterMessage(msg)}
-          onError={(msg) => setRegisterError(msg)}
+          onClose={() => {
+            setShowRegister(false);
+            setRegisterError(null);
+          }}
+          onSuccess={(msg) => {
+            setRegisterError(null);
+            setRegisterMessage(msg);
+          }}
+          onError={(msg) => {
+            setRegisterError(msg);
+            setRegisterMessage(null);
+          }}
         />
       )}
 
-      {(registerMessage || registerError) && (
+      {registerError && (
         <div className="border rounded-md p-3 bg-white/70">
-          {registerMessage && <p className="text-green-700">{registerMessage}</p>}
-          {registerError && <p className="text-red-600">{registerError}</p>}
+          <p className="text-red-600">{registerError}</p>
         </div>
       )}
     </main>
@@ -210,6 +232,7 @@ type MemberEntry = {
 type RegisterModalProps = {
   eventSlug: string;
   eventName: string;
+  refetchTeams: () => Promise<void>;
   auth: ReturnType<typeof useAuth>;
   directory: ReturnType<typeof useUserDirectory>['users'];
   memberships: ReturnType<typeof useEventMemberships>['memberships'];
@@ -221,6 +244,7 @@ type RegisterModalProps = {
 function RegisterModal({
   eventSlug,
   eventName,
+  refetchTeams,
   auth,
   directory,
   memberships,
@@ -228,11 +252,22 @@ function RegisterModal({
   onSuccess,
   onError,
 }: RegisterModalProps) {
+  const navigate = useNavigate();
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, []);
+
   const user = auth.user;
-  const [teamName, setTeamName] = useState(() => (user ? `${user.display_name}'s Team` : ''));
+  const defaultTeamName = user ? `${user.display_name}'s Team` : 'My Team';
+  const [teamName, setTeamName] = useState('');
   const [teamSize, setTeamSize] = useState(3);
   const [memberInput, setMemberInput] = useState('');
   const [saving, setSaving] = useState(false);
+  const [localError, setLocalError] = useState<string | null>(null);
 
   const [members, setMembers] = useState<MemberEntry[]>(() => {
     if (!user) return [];
@@ -296,6 +331,7 @@ function RegisterModal({
   const addMember = (entry: MemberEntry) => {
     setMembers((prev) => markIneligibility([...prev, entry], teamSize));
     setMemberInput('');
+    setLocalError(null);
   };
 
   const handleAddMemberInput = () => {
@@ -304,7 +340,9 @@ function RegisterModal({
     const existing = directory.find((u) => u.display_name.toLowerCase() === name.toLowerCase());
     if (existing && !members.some((m) => m.id === existing.id)) {
       if (conflictsBySize.get(teamSize)?.has(existing.id)) {
-        onError(`${existing.display_name} is already on a ${teamSize}p team for this event.`);
+        const msg = `${existing.display_name} is already on a ${teamSize}p team for this event.`;
+        setLocalError(msg);
+        onError(msg);
         return;
       }
       addMember({
@@ -336,23 +374,25 @@ function RegisterModal({
   };
 
   const handleSubmit = async () => {
-    if (!teamName.trim()) {
-      onError('Team name is required.');
-      return;
-    }
+    const finalName = teamName.trim() || defaultTeamName;
     if (members.length === 0) {
-      onError('Add at least one member.');
+      const msg = 'Add at least one member.';
+      setLocalError(msg);
+      onError(msg);
       return;
     }
     if (!auth.token) {
-      onError('Not authenticated.');
+      const msg = 'Not authenticated.';
+      setLocalError(msg);
+      onError(msg);
       return;
     }
     setSaving(true);
+    setLocalError(null);
     onError(null);
     try {
       const payload = {
-        team_name: teamName.trim(),
+        team_name: finalName,
         team_size: teamSize,
         members: members.map((m) =>
           m.id
@@ -361,13 +401,30 @@ function RegisterModal({
         ),
       };
       await postJsonAuth(`/events/${eventSlug}/register`, auth.token, payload);
+      onError(null);
+      setLocalError(null);
       onSuccess('Team registered!');
+      try {
+        await refetchTeams();
+      } catch (fetchErr) {
+        console.error('Failed to refresh teams after register', fetchErr);
+      }
+      const target =
+        teamSize === 3
+          ? `/events/${eventSlug}`
+          : `/events/${eventSlug}/${teamSize}`;
+      navigate(target, { replace: true });
       onClose();
     } catch (err) {
       if (err instanceof ApiError) {
-        onError((err.body as { error?: string })?.error ?? 'Failed to register team.');
+        const msg =
+          (err.body as { error?: string })?.error ?? 'Failed to register team.';
+        setLocalError(msg);
+        onError(msg);
       } else {
-        onError('Failed to register team.');
+        const msg = 'Failed to register team.';
+        setLocalError(msg);
+        onError(msg);
       }
     } finally {
       setSaving(false);
@@ -375,109 +432,195 @@ function RegisterModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg p-4 space-y-4 max-w-2xl w-full">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-xl font-semibold">Register for {eventName}</h2>
-            <p className="text-sm text-gray-600">Create a team and invite members.</p>
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '16px',
+        zIndex: 2000,
+        background: 'rgba(0,0,0,0.25)',
+        backdropFilter: 'blur(2px)',
+      }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div
+        className="card stack-sm"
+        style={{ maxWidth: '720px', width: '100%', padding: '16px', boxShadow: 'var(--shadow-hover)' }}
+      >
+        <div style={{ position: 'relative' }}>
+          <div className="stack-xxs">
+            <h2 className="text-xl font-semibold" style={{ margin: 0 }}>
+              Register for {eventName}
+            </h2>
+            <p className="text-sm text-gray-600" style={{ margin: 0 }}>
+              Create a team, set your size, and add members.
+            </p>
           </div>
-          <button onClick={onClose} className="text-gray-600">
-            ✕
-          </button>
-        </div>
-
-        <div className="space-y-2">
-          <label className="block text-sm font-medium text-gray-700">Team name</label>
-          <input
-            className="w-full border rounded px-3 py-2"
-            value={teamName}
-            onChange={(e) => setTeamName(e.target.value)}
-          />
-        </div>
-
-        <div className="space-y-2">
-          <label className="block text-sm font-medium text-gray-700">Team size</label>
-          <select
-            className="border rounded px-3 py-2"
-            value={teamSize}
-            onChange={(e) => {
-              const next = Number(e.target.value);
-              setTeamSize(next);
-              setMembers((prev) => markIneligibility(prev, next));
+          <button
+            onClick={onClose}
+            className="material-symbols-outlined"
+            aria-label="Close"
+            title="Close"
+            style={{
+              position: 'absolute',
+              top: 0,
+              right: 0,
+              border: 'none',
+              background: 'transparent',
+              color: 'var(--color-text)',
+              cursor: 'pointer',
             }}
           >
-            {[2, 3, 4, 5, 6].map((n) => (
-              <option key={n} value={n}>
-                {n} players
-              </option>
-            ))}
-          </select>
+            close
+          </button>
         </div>
 
-        <div className="space-y-2">
-          <label className="block text-sm font-medium text-gray-700">Members</label>
-          <div className="border rounded px-2 py-2 flex flex-wrap gap-2 items-center">
-            {members.map((m) => (
-              <MemberChip
-                key={`${m.display_name}-${m.id ?? 'pending'}`}
-                member={m}
-                onRemove={() => removeMember(m.display_name)}
-              />
-            ))}
+        <div className="grid gap-3 md:grid-cols-2">
+          <div className="stack-xxs">
+            <label className="text-sm font-medium text-gray-700">Team name</label>
             <input
-              className="flex-1 min-w-[140px] border-0 outline-none px-1 py-1"
-              placeholder="Add member by name"
-              value={memberInput}
-              onChange={(e) => setMemberInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ',') {
-                  e.preventDefault();
-                  handleAddMemberInput();
-                }
-              }}
+              className="input"
+              value={teamName}
+              onChange={(e) => setTeamName(e.target.value)}
+              placeholder={defaultTeamName}
             />
           </div>
-
-          {suggestions.length > 0 && (
-            <div className="border rounded p-2 bg-white shadow-sm">
-              <p className="text-xs text-gray-500 mb-1">Suggestions</p>
-              <div className="flex flex-wrap gap-1">
-                {suggestions.map((s) => (
-                  <button
-                    key={s.id}
-                    className="border rounded px-2 py-1 text-sm bg-white hover:bg-blue-50"
-                    onClick={() =>
-                      addMember({
-                        id: s.id,
-                        display_name: s.display_name,
-                        color_hex: s.color_hex,
-                        text_color: s.text_color,
-                        role: 'PLAYER',
-                      })
-                    }
-                  >
-                    {s.display_name}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <p className="text-xs text-gray-600">
-            The logged-in user is added automatically and cannot be removed.
-          </p>
+          <div className="stack-xxs">
+            <label className="text-sm font-medium text-gray-700">Team size</label>
+            <select
+              className="select"
+              value={teamSize}
+              onChange={(e) => {
+                const next = Number(e.target.value);
+                setTeamSize(next);
+                setMembers((prev) => markIneligibility(prev, next));
+              }}
+            >
+              {[2, 3, 4, 5, 6].map((n) => (
+                <option key={n} value={n}>
+                  {n} players
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
-        <div className="flex justify-end gap-2">
-          <button className="px-3 py-2 rounded border" onClick={onClose} disabled={saving}>
-            Cancel
-          </button>
-          <button
-            className="px-4 py-2 rounded bg-blue-600 text-white font-semibold disabled:opacity-60"
-            onClick={handleSubmit}
-            disabled={saving}
+        <div className="stack-xxs">
+          <label className="text-sm font-medium text-gray-700">Members</label>
+          <div
+            style={{
+              position: 'relative',
+              border: '1px solid var(--color-border)',
+              borderRadius: 'var(--radius-sm)',
+              background: '#fff',
+              padding: '8px',
+              minHeight: '52px',
+            }}
           >
+            <div className="flex flex-wrap gap-2 items-center">
+              {members.map((m) => (
+                <MemberChip
+                  key={`${m.display_name}-${m.id ?? 'pending'}`}
+                  member={m}
+                  onRemove={() => removeMember(m.display_name)}
+                />
+              ))}
+              <input
+                className="flex-1 min-w-[140px] border-0 outline-none px-1 py-1"
+                placeholder="Add member by name"
+                value={memberInput}
+                onChange={(e) => setMemberInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ',') {
+                    e.preventDefault();
+                    handleAddMemberInput();
+                  }
+                  if (e.key === 'Tab') {
+                    if (suggestions.length > 0) {
+                      e.preventDefault();
+                      addMember({
+                        id: suggestions[0].id,
+                        display_name: suggestions[0].display_name,
+                        color_hex: suggestions[0].color_hex,
+                        text_color: suggestions[0].text_color,
+                        role: 'PLAYER',
+                      });
+                      setMemberInput('');
+                    } else {
+                      handleAddMemberInput();
+                    }
+                  }
+                }}
+              />
+            </div>
+
+            {suggestions.length > 0 && (
+              <div
+                className="card"
+                style={{
+                  position: 'absolute',
+                  left: '8px',
+                  right: '8px',
+                  top: 'calc(100% + 6px)',
+                  zIndex: 10,
+                  padding: '6px',
+                  boxShadow: 'var(--shadow-card)',
+                }}
+              >
+                <p className="text-xs text-gray-500" style={{ margin: '0 0 4px 0' }}>
+                  Suggestions
+                </p>
+                <div className="flex flex-wrap gap-1">
+                  {suggestions.map((s) => (
+                    <button
+                      key={s.id}
+                      className="border rounded px-2 py-1 text-sm bg-white hover:bg-blue-50"
+                      onClick={() => {
+                        addMember({
+                          id: s.id,
+                          display_name: s.display_name,
+                          color_hex: s.color_hex,
+                          text_color: s.text_color,
+                          role: 'PLAYER',
+                        });
+                        setMemberInput('');
+                      }}
+                    >
+                      {s.display_name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {localError && (
+          <div
+            className="flex items-center text-sm"
+            style={{ color: 'var(--color-danger)', gap: '6px' }}
+          >
+            <span className="material-symbols-outlined" aria-hidden="true" style={{ color: 'inherit' }}>
+              error
+            </span>
+            <span style={{ color: 'inherit' }}>{localError}</span>
+          </div>
+        )}
+
+        <div
+          style={{
+            marginTop: 'var(--space-sm)',
+            display: 'flex',
+            justifyContent: 'flex-end',
+            width: '100%',
+          }}
+        >
+          <button className="btn btn--primary" onClick={handleSubmit} disabled={saving}>
             {saving ? 'Registering...' : 'Submit'}
           </button>
         </div>
@@ -497,22 +640,32 @@ function MemberChip({
   const fg = member.text_color || '#ffffff';
   const pillBg = member.ineligible ? '#dc2626' : member.isPending ? '#777777' : bg;
   const pillFg = member.ineligible ? '#ffffff' : member.isPending ? '#ffffff' : fg;
+  const locked = member.locked;
   return (
-    <div className="flex items-center gap-1 border rounded-full pl-2 pr-1 py-1 bg-white shadow-sm">
+    <div
+      className="flex items-center gap-1 border rounded-full pl-2 pr-1 py-1 bg-white shadow-sm"
+      style={{
+        display: 'inline-flex',
+        cursor: locked ? 'not-allowed' : 'pointer',
+        marginRight: '6px',
+        marginBottom: '4px',
+        fontStyle: member.isPending || !member.id ? 'italic' : undefined,
+      }}
+      title={
+        locked
+          ? 'You are automatically included and cannot be removed'
+          : 'Click to remove'
+      }
+      onClick={() => {
+        if (!locked) onRemove();
+      }}
+    >
       <UserPill
         name={member.display_name}
         color={pillBg}
         textColor={pillFg}
-        className={member.isPending ? 'italic' : ''}
+        className={member.isPending || !member.id ? 'user-pill--pending' : ''}
       />
-      {!member.locked && (
-        <button
-          className="text-xs text-red-600 px-2 py-0.5 rounded-full hover:bg-red-50"
-          onClick={onRemove}
-        >
-          ×
-        </button>
-      )}
     </div>
   );
 }

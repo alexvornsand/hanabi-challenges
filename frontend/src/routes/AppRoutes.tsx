@@ -2,6 +2,8 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { MainLayout } from '../layouts/MainLayout';
 import { LandingPage } from '../pages/LandingPage';
+import { AboutPage } from '../pages/AboutPage';
+import { AboutFAQPage } from '../pages/AboutFAQPage';
 import { EventArchivePage } from '../pages/EventArchivePage';
 import { EventDetailPage } from '../pages/EventDetailPage';
 import { TeamPage } from '../pages/TeamPage';
@@ -21,8 +23,10 @@ export function AppRoutes() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<MainLayout />}>
-          {/* Home */}
-          <Route index element={<LandingPage />} />
+        {/* Home */}
+        <Route index element={<LandingPage />} />
+        <Route path="about" element={<AboutPage />} />
+        <Route path="about/FAQ" element={<AboutFAQPage />} />
 
           {/* Events */}
           <Route path="events">
@@ -44,6 +48,7 @@ export function AppRoutes() {
           <Route path="admin">
             <Route index element={<AdminHomePage />} />
             <Route path="create-event" element={<AdminCreateEventPage />} />
+            <Route path="events/:slug/edit" element={<AdminCreateEventPage />} />
             <Route path="manage-users" element={<AdminManageUsersPage />} />
           </Route>
 

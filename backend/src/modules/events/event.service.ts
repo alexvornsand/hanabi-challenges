@@ -15,6 +15,9 @@ export interface Event {
   name: string;
   short_description: string | null;
   long_description: string;
+  published: boolean;
+  allow_late_registration: boolean;
+  registration_cutoff: string | null;
   starts_at: string | null;
   ends_at: string | null;
 }
@@ -55,6 +58,9 @@ export interface EventDetail {
   name: string;
   short_description: string | null;
   long_description: string;
+  published: boolean;
+  allow_late_registration: boolean;
+  registration_cutoff: string | null;
   starts_at: string | null;
   ends_at: string | null;
 }
@@ -64,6 +70,21 @@ export interface CreateEventInput {
   slug: string;
   short_description?: string | null;
   long_description: string;
+  published?: boolean;
+  allow_late_registration?: boolean;
+  registration_cutoff?: string | null;
+  starts_at?: string | null;
+  ends_at?: string | null;
+}
+
+export interface UpdateEventInput {
+  name?: string;
+  slug?: string;
+  short_description?: string | null;
+  long_description?: string;
+  published?: boolean;
+  allow_late_registration?: boolean;
+  registration_cutoff?: string | null;
   starts_at?: string | null;
   ends_at?: string | null;
 }
@@ -80,6 +101,9 @@ export async function listEvents(): Promise<Event[]> {
       name,
       short_description,
       long_description,
+      published,
+      allow_late_registration,
+      registration_cutoff,
       starts_at,
       ends_at
     FROM events
@@ -94,7 +118,17 @@ export async function listEvents(): Promise<Event[]> {
  * Create a new event
  * ----------------------------------------*/
 export async function createEvent(input: CreateEventInput) {
-  const { name, slug, short_description, long_description, starts_at, ends_at } = input;
+  const {
+    name,
+    slug,
+    short_description,
+    long_description,
+    starts_at,
+    ends_at,
+    published,
+    allow_late_registration,
+    registration_cutoff,
+  } = input;
 
   if (!slug) {
     throw { code: 'EVENT_SLUG_REQUIRED' } as { code: string };
@@ -106,11 +140,31 @@ export async function createEvent(input: CreateEventInput) {
   try {
     const result = await pool.query(
       `
-      INSERT INTO events (name, slug, short_description, long_description, starts_at, ends_at)
-      VALUES ($1, $2, $3, $4, $5, $6)
-      RETURNING id, name, slug, short_description, long_description, starts_at, ends_at, created_at;
+      INSERT INTO events (
+        name,
+        slug,
+        short_description,
+        long_description,
+        published,
+        allow_late_registration,
+        registration_cutoff,
+        starts_at,
+        ends_at
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      RETURNING id, name, slug, short_description, long_description, published, allow_late_registration, registration_cutoff, starts_at, ends_at, created_at;
       `,
-      [name, slug, short_description ?? null, long_description, starts_at, ends_at],
+      [
+        name,
+        slug,
+        short_description ?? null,
+        long_description,
+        published ?? false,
+        allow_late_registration ?? true,
+        registration_cutoff ?? null,
+        starts_at,
+        ends_at,
+      ],
     );
 
     return result.rows[0];
@@ -125,6 +179,67 @@ export async function createEvent(input: CreateEventInput) {
 }
 
 /* ------------------------------------------
+ * Update an event by slug
+ * ----------------------------------------*/
+export async function updateEventBySlug(slug: string, input: UpdateEventInput) {
+  const existing = await getEventBySlug(slug);
+  if (!existing) {
+    throw new Error('EVENT_NOT_FOUND');
+  }
+
+  const next = {
+    name: input.name ?? existing.name,
+    slug: input.slug ?? existing.slug,
+    short_description:
+      input.short_description !== undefined ? input.short_description : existing.short_description,
+    long_description: input.long_description ?? existing.long_description,
+    published: input.published ?? existing.published,
+    allow_late_registration:
+      input.allow_late_registration !== undefined
+        ? input.allow_late_registration
+        : existing.allow_late_registration,
+    registration_cutoff:
+      input.registration_cutoff !== undefined
+        ? input.registration_cutoff
+        : existing.registration_cutoff,
+    starts_at: input.starts_at !== undefined ? input.starts_at : existing.starts_at,
+    ends_at: input.ends_at !== undefined ? input.ends_at : existing.ends_at,
+  };
+
+  const result = await pool.query<Event>(
+    `
+    UPDATE events
+    SET
+      name = $1,
+      slug = $2,
+      short_description = $3,
+      long_description = $4,
+      published = $5,
+      allow_late_registration = $6,
+      registration_cutoff = $7,
+      starts_at = $8,
+      ends_at = $9
+    WHERE slug = $10
+    RETURNING id, slug, name, short_description, long_description, published, allow_late_registration, registration_cutoff, starts_at, ends_at;
+    `,
+    [
+      next.name,
+      next.slug,
+      next.short_description,
+      next.long_description,
+      next.published,
+      next.allow_late_registration,
+      next.registration_cutoff,
+      next.starts_at,
+      next.ends_at,
+      slug,
+    ],
+  );
+
+  return result.rows[0];
+}
+
+/* ------------------------------------------
  * Get an event by slug
  * ----------------------------------------*/
 export async function getEventBySlug(slug: string): Promise<EventDetail | null> {
@@ -136,6 +251,9 @@ export async function getEventBySlug(slug: string): Promise<EventDetail | null> 
       name,
       short_description,
       long_description,
+      published,
+      allow_late_registration,
+      registration_cutoff,
       starts_at,
       ends_at
     FROM events
@@ -212,10 +330,17 @@ export async function createEventGameTemplate(
         max_score,
         metadata_json
       )
-      VALUES ($1, $2, $3, $4, $5)
+      VALUES ($1, $2, $3, $4, $5, $6)
       RETURNING id, event_stage_id, template_index, variant, seed_payload, max_score, metadata_json, created_at;
       `,
-      [eventStageId, template_index, normalizedVariant, seed_payload, normalizedMaxScore, normalizedMetadata],
+      [
+        eventStageId,
+        template_index,
+        normalizedVariant,
+        seed_payload,
+        normalizedMaxScore,
+        normalizedMetadata,
+      ],
     );
 
     return result.rows[0];

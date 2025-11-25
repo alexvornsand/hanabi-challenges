@@ -83,18 +83,17 @@ export function LoginPage() {
   }
 
   return (
-    <main className="p-4 max-w-lg mx-auto space-y-4">
-      <header>
+    <main className="page stack-md" style={{ maxWidth: '480px' }}>
+      <header className="stack-xs">
         <h1 className="text-2xl font-bold">Log in</h1>
-        <p className="text-gray-700 mt-1">
-          Enter your username and password to log in. If the username is new, an account will be
-          created.
+        <p className="text-gray-700">
+          Enter your username and password. New usernames will create an account automatically.
         </p>
       </header>
 
-      <form onSubmit={handleSubmit} className="space-y-3 border rounded-lg p-4 bg-white/70">
-        <div className="space-y-1">
-          <label className="block text-sm font-medium text-gray-700" htmlFor="displayName">
+      <form onSubmit={handleSubmit} className="card stack-sm">
+        <div className="stack-xxs">
+          <label className="text-sm font-medium text-gray-700" htmlFor="displayName">
             Username
           </label>
           <input
@@ -103,13 +102,13 @@ export function LoginPage() {
             required
             value={displayName}
             onChange={(e) => setDisplayName(e.target.value)}
-            className="w-full border rounded px-3 py-2"
+            className="input"
             autoComplete="username"
           />
         </div>
 
-        <div className="space-y-1">
-          <label className="block text-sm font-medium text-gray-700" htmlFor="password">
+        <div className="stack-xxs">
+          <label className="text-sm font-medium text-gray-700" htmlFor="password">
             Password
           </label>
           <input
@@ -118,21 +117,26 @@ export function LoginPage() {
             required
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full border rounded px-3 py-2"
+            className="input"
             autoComplete="current-password"
           />
         </div>
 
         <button
           type="submit"
-          className="w-full px-4 py-2 rounded bg-blue-600 text-white font-semibold disabled:opacity-60"
+          className="btn btn--primary"
           disabled={loading}
+          style={{ width: '100%' }}
         >
           {loading ? 'Logging in...' : 'Log in'}
         </button>
       </form>
 
-      {error && <p className="text-red-600">{error}</p>}
+      {error && (
+        <p className="text-red-600 text-sm" role="alert">
+          {error}
+        </p>
+      )}
 
     </main>
   );

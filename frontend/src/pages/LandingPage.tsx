@@ -38,8 +38,13 @@ export const LandingPage: React.FC = () => {
           Overview
         </h2>
         <p className="text-gray-700">
-          Track challenge events, register teams, and log game results pulled from hanab.live replays.
-          Build rosters, validate runs, and compare performance across stages—all in one place.
+          Welcome! This is where Hanabi players organize and track community challenges and tournaments.
+          You can browse current events, see their rules and timelines, and join with your team to play
+          through preset seeds. We keep your team’s progress and results together so everyone knows where
+          they stand. If you’re curious about an event, click in to see the format and how to participate.
+          If you’re ready to play, register a team and start logging games. Whether you’re jumping into
+          an active challenge or catching up later with friends, this is the hub for following along and
+          comparing runs.
         </p>
       </section>
 
@@ -88,9 +93,13 @@ export const LandingPage: React.FC = () => {
                 >
                   {formatDateRange(event.starts_at, event.ends_at)}
                 </span>
-                <p className="text-sm text-gray-700">
-                  {event.long_description || event.short_description || 'No description provided.'}
-                </p>
+                <div
+                  className="text-sm text-gray-700"
+                  style={{ whiteSpace: 'pre-line' }}
+                  dangerouslySetInnerHTML={{
+                    __html: renderMarkdown(event.long_description || event.short_description || ''),
+                  }}
+                />
               </div>
             ))}
           </div>
@@ -99,3 +108,35 @@ export const LandingPage: React.FC = () => {
     </main>
   );
 };
+
+function renderMarkdown(md: string) {
+  const escape = (s: string) =>
+    s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+  const emojiMap: Record<string, string> = {
+    firework: '🎆',
+    fireworks: '🎆',
+    tada: '🎉',
+    sparkles: '✨',
+    star: '⭐️',
+  };
+
+  let html = escape(md || '');
+  html = html.replace(/:([a-z0-9_+-]+):/gi, (_, code) => emojiMap[code] || `:${code}:`);
+  html = html.replace(/^### (.*)$/gm, '<h4>$1</h4>');
+  html = html.replace(/^## (.*)$/gm, '<h3>$1</h3>');
+  html = html.replace(/^# (.*)$/gm, '<h2>$1</h2>');
+  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+  html = html.replace(/`(.+?)`/g, '<code>$1</code>');
+  html = html.replace(/(^|\n)- (.*)/g, (m, p1, item) => `${p1}<li>${item}</li>`);
+  html = html.replace(/(<li>.*<\/li>)/gs, (m) => `<ul>${m}</ul>`);
+  html = html
+    .split(/\n{2,}/)
+    .map((block) => {
+      if (block.startsWith('<h') || block.startsWith('<ul>')) return block;
+      return `<p>${block.replace(/\n/g, '<br/>')}</p>`;
+    })
+    .join('');
+  return html || '<p>No description provided.</p>';
+}
