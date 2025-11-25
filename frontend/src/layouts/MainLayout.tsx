@@ -3,7 +3,7 @@ import { Outlet, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 export const MainLayout: React.FC = () => {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
 
   return (
     <div
@@ -32,19 +32,28 @@ export const MainLayout: React.FC = () => {
             <Link to="/about">About</Link>
             {user && (user.role === 'ADMIN' || user.role === 'SUPERADMIN') && <Link to="/admin">Admin</Link>}
           </div>
-          <div style={{ marginLeft: 'auto' }}>
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px' }}>
             {user ? (
-              <Link
-                to="/me"
-                className="main-nav__login-btn main-nav__login-btn--user"
-                style={{
-                  backgroundColor: user.color_hex || '#777777',
-                  color: user.text_color || '#ffffff',
-                  borderColor: user.color_hex || '#777777',
-                }}
-              >
-                {user.display_name}
-              </Link>
+              <>
+                <Link
+                  to="/me"
+                  className="main-nav__login-btn main-nav__login-btn--user"
+                  style={{
+                    backgroundColor: user.color_hex || '#777777',
+                    color: user.text_color || '#ffffff',
+                    borderColor: user.color_hex || '#777777',
+                  }}
+                >
+                  {user.display_name}
+                </Link>
+                <button
+                  className="btn btn--secondary"
+                  onClick={() => logout()}
+                  style={{ padding: '6px 10px' }}
+                >
+                  Log out
+                </button>
+              </>
             ) : (
               <Link to="/login" className="main-nav__login-btn">
                 Log in
