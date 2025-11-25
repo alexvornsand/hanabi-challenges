@@ -65,8 +65,7 @@ export function EventDetailPage() {
   const endsAt = event.ends_at ? new Date(event.ends_at) : null;
   const cutoff = event.registration_cutoff ? new Date(event.registration_cutoff) : endsAt;
   const now = new Date();
-  const registrationClosed =
-    (cutoff && now > cutoff) || (!event.allow_late_registration && cutoff && now > cutoff);
+  const registrationClosed = !!(cutoff && now > cutoff && !event.allow_late_registration);
 
   return (
     <main className="page">
@@ -309,6 +308,17 @@ function RegisterModal({
       .slice(0, 5);
   }, [memberInput, directory, members, conflictsBySize, teamSize]);
 
+  useEffect(() => {
+    const invalid = members.filter((m) => m.ineligible);
+    if (invalid.length > 0) {
+      setLocalError(
+        `${invalid.map((m) => m.display_name).join(', ')} already on a ${teamSize}p team.`,
+      );
+    } else if (localError && localError.includes('already on a')) {
+      setLocalError(null);
+    }
+  }, [members, teamSize]); // eslint-disable-line react-hooks/exhaustive-deps
+
   if (!user) {
     return (
       <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4">
@@ -377,6 +387,13 @@ function RegisterModal({
     const finalName = teamName.trim() || defaultTeamName;
     if (members.length === 0) {
       const msg = 'Add at least one member.';
+      setLocalError(msg);
+      onError(msg);
+      return;
+    }
+    const invalid = members.filter((m) => m.ineligible);
+    if (invalid.length > 0) {
+      const msg = `${invalid.map((m) => m.display_name).join(', ')} already on a ${teamSize}p team.`;
       setLocalError(msg);
       onError(msg);
       return;

@@ -54,6 +54,7 @@ CREATE TABLE event_teams (
   id SERIAL PRIMARY KEY,
   event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
+  owner_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   team_size INTEGER NOT NULL CHECK (team_size IN (2, 3, 4, 5, 6)),
   table_password TEXT,

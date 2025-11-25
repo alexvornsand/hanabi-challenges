@@ -52,7 +52,7 @@ VALUES
     'Seasonal spring ladder',
     $$A seasonal circuit with mixed variants and rotating seeds.\nPlay clean, log your replays, and chase consistency across the whole stage.$$,
     TRUE,
-    FALSE,
+    TRUE,
     '2025-02-25T00:00:00Z',
     '2025-03-01T00:00:00Z',
     '2025-06-01T00:00:00Z'
@@ -118,12 +118,12 @@ VALUES
 -- ================================
 -- team_size = number of players at the table (per game), not roster size.
 
-INSERT INTO event_teams (event_id, name, team_size, table_password)
+INSERT INTO event_teams (event_id, name, team_size, table_password, owner_user_id)
 VALUES
-  (1, 'Lanterns',      2, 'team1234'), -- 2p team
-  (1, 'Clue Crew',     3, 'team1234'), -- 3p team
-  (2, 'Faded Signals', 4, 'team1234'), -- 4p team
-  (2, 'Risky Fuses',   3, 'team1234'); -- 3p team
+  (1, 'Lanterns',      2, 'team1234', 1), -- owner alice
+  (1, 'Clue Crew',     3, 'team1234', 2), -- owner bob
+  (2, 'Faded Signals', 4, 'team1234', 3), -- owner cathy
+  (2, 'Risky Fuses',   3, 'team1234', 4); -- owner donald
 
 -- event_team_ids:
 -- 1 = Lanterns       (event 1)

@@ -9,6 +9,10 @@ import {
   getEventTeamDetail,
   listTeamGames,
   listTeamTemplatesWithResults,
+  hasUserPlayedOnTeam,
+  hasTeamGames,
+  removeTeamMember,
+  deleteEventTeam,
 } from './team.service';
 import { authRequired, AuthenticatedRequest } from '../../middleware/authMiddleware';
 
@@ -94,6 +98,7 @@ router.get('/:id/members', async (req: Request, res: Response) => {
 // POST /api/event-teams (auth required)
 router.post('/', authRequired, async (req: AuthenticatedRequest, res: Response) => {
   const { event_id, name, team_size } = req.body;
+  const requester = req.user;
 
   if (!event_id || !name || team_size == null) {
     res.status(400).json({
@@ -115,6 +120,7 @@ router.post('/', authRequired, async (req: AuthenticatedRequest, res: Response) 
       event_id,
       name,
       team_size: parsedTeamSize,
+      owner_user_id: requester?.userId ?? null,
     });
 
     res.status(201).json(team);
@@ -132,9 +138,10 @@ router.post('/', authRequired, async (req: AuthenticatedRequest, res: Response) 
 });
 
 // POST /api/event-teams/:id/members (auth required)
-router.post('/:id/members', authRequired, async (req: Request, res: Response) => {
+router.post('/:id/members', authRequired, async (req: AuthenticatedRequest, res: Response) => {
   const eventTeamId = Number(req.params.id);
   const { user_id, role, is_listed = true } = req.body;
+  const requester = req.user;
 
   if (Number.isNaN(eventTeamId)) {
     res.status(400).json({ error: 'Invalid event team id' });
@@ -156,6 +163,19 @@ router.post('/:id/members', authRequired, async (req: Request, res: Response) =>
   }
 
   try {
+    const team = await getEventTeamDetail(eventTeamId);
+    if (!team) {
+      res.status(404).json({ error: 'Team not found' });
+      return;
+    }
+
+    const isOwner = requester && team.owner_user_id != null && team.owner_user_id === requester.userId;
+    const isAdmin = requester && (requester.role === 'ADMIN' || requester.role === 'SUPERADMIN');
+    if (!isOwner && !isAdmin) {
+      res.status(403).json({ error: 'Only the team owner or an admin can add members' });
+      return;
+    }
+
     const member = await addTeamMember({
       event_team_id: eventTeamId,
       user_id,
@@ -174,6 +194,106 @@ router.post('/:id/members', authRequired, async (req: Request, res: Response) =>
 
     console.error('Error adding team member:', err);
     res.status(500).json({ error: 'Failed to add team member' });
+  }
+});
+
+// DELETE /api/event-teams/:id/members/:userId (auth required)
+router.delete(
+  '/:id/members/:userId',
+  authRequired,
+  async (req: AuthenticatedRequest, res: Response) => {
+    const eventTeamId = Number(req.params.id);
+    const targetUserId = Number(req.params.userId);
+
+    if (Number.isNaN(eventTeamId) || Number.isNaN(targetUserId)) {
+      res.status(400).json({ error: 'Invalid id' });
+      return;
+    }
+
+    try {
+      const team = await getEventTeamDetail(eventTeamId);
+      if (!team) {
+        res.status(404).json({ error: 'Team not found' });
+        return;
+      }
+      const requester = req.user;
+      if (!requester) {
+        res.status(401).json({ error: 'Not authenticated' });
+        return;
+      }
+
+      const isSelf = requester.userId === targetUserId;
+      const isOwner =
+        team.owner_user_id != null && requester.userId === team.owner_user_id;
+      const isAdmin = requester.role === 'ADMIN' || requester.role === 'SUPERADMIN';
+      if (!isSelf && !isOwner && !isAdmin) {
+        res.status(403).json({ error: 'Not authorized to remove this member' });
+        return;
+      }
+
+      const alreadyPlayed = await hasUserPlayedOnTeam(eventTeamId, targetUserId);
+      if (alreadyPlayed) {
+        res
+          .status(409)
+          .json({ error: 'This member has recorded games and cannot be removed.' });
+        return;
+      }
+
+      const removed = await removeTeamMember(eventTeamId, targetUserId);
+      if (!removed) {
+        res.status(404).json({ error: 'Member not found on team' });
+        return;
+      }
+      res.status(204).end();
+    } catch (err) {
+      console.error('Error removing team member:', err);
+      res.status(500).json({ error: 'Failed to remove team member' });
+    }
+  },
+);
+
+// DELETE /api/event-teams/:id (owner/admin, only if no games)
+router.delete('/:id', authRequired, async (req: AuthenticatedRequest, res: Response) => {
+  const eventTeamId = Number(req.params.id);
+  if (Number.isNaN(eventTeamId)) {
+    res.status(400).json({ error: 'Invalid event team id' });
+    return;
+  }
+
+  const requester = req.user;
+  if (!requester) {
+    res.status(401).json({ error: 'Not authenticated' });
+    return;
+  }
+
+  try {
+    const team = await getEventTeamDetail(eventTeamId);
+    if (!team) {
+      res.status(404).json({ error: 'Team not found' });
+      return;
+    }
+    const isOwner = team.owner_user_id != null && requester.userId === team.owner_user_id;
+    const isAdmin = requester.role === 'ADMIN' || requester.role === 'SUPERADMIN';
+    if (!isOwner && !isAdmin) {
+      res.status(403).json({ error: 'Only the team owner or an admin can delete this team' });
+      return;
+    }
+
+    const hasGames = await hasTeamGames(eventTeamId);
+    if (hasGames) {
+      res.status(409).json({ error: 'Team has recorded games and cannot be deleted' });
+      return;
+    }
+
+    const deleted = await deleteEventTeam(eventTeamId);
+    if (!deleted) {
+      res.status(404).json({ error: 'Team not found' });
+      return;
+    }
+    res.status(204).end();
+  } catch (err) {
+    console.error('Error deleting team:', err);
+    res.status(500).json({ error: 'Failed to delete team' });
   }
 });
 

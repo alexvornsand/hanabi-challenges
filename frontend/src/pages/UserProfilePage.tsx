@@ -62,57 +62,62 @@ export function UserProfilePage() {
 
   if (loading) {
     return (
-      <main className="p-4">
-        <p>Loading user...</p>
+      <main className="page">
+        <div className="card">
+          <p className="text-gray-700">Loading user…</p>
+        </div>
       </main>
     );
   }
 
   return (
-    <main className="p-4 space-y-3">
+    <main className="page stack">
       {error || !user ? (
-        <div className="space-y-2">
+        <div className="card stack-sm">
           <p className="text-red-600">{error ?? 'User not found'}</p>
           <button
             onClick={() => navigate('/')}
-            className="px-3 py-2 rounded bg-blue-600 text-white font-semibold"
+            className="btn btn--primary"
           >
             Go home
           </button>
         </div>
       ) : (
-        <>
-          <UserPill
-            name={user.display_name}
-            color={user.color_hex}
-            textColor={user.text_color}
-            className="text-base"
-          />
-          <p className="text-gray-700">Role: {user.role}</p>
+        <div className="card stack-sm">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-2xl font-bold" style={{ margin: 0 }}>
+                {user.display_name}
+              </h1>
+              <span className="pill text-xs text-gray-700 bg-gray-100">{user.role}</span>
+            </div>
+            {authUser && authUser.displayName === user.display_name && (
+              <button
+                onClick={() => {
+                  logout();
+                  navigate('/login');
+                }}
+                className="btn"
+                style={{ backgroundColor: '#dc2626', color: '#fff' }}
+              >
+                Log out
+              </button>
+            )}
+          </div>
+
           <p className="text-gray-600 text-sm">
-            Joined: {new Date(user.created_at).toLocaleString()}
+            Joined {new Date(user.created_at).toLocaleDateString()}
           </p>
-          <div className="flex gap-3 text-sm">
-            <Link className="text-blue-700 underline" to={`/users/${user.display_name}/events`}>
+
+          <div className="flex gap-3 text-sm flex-wrap">
+            <Link className="btn btn--secondary" to={`/users/${user.display_name}/events`}>
               Events
             </Link>
-            <Link className="text-blue-700 underline" to={`/users/${user.display_name}/badges`}>
+            <Link className="btn btn--secondary" to={`/users/${user.display_name}/badges`}>
               Badges
             </Link>
           </div>
-        </>
-      )}
-
-      {authUser && (
-        <button
-          onClick={() => {
-            logout();
-            navigate('/login');
-          }}
-          className="px-3 py-2 rounded bg-red-600 text-white font-semibold"
-        >
-          Log out
-        </button>
+        </div>
       )}
     </main>
   );

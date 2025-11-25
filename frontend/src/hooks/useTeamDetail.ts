@@ -45,6 +45,7 @@ export type TeamDetail = {
     event_slug: string;
     event_name: string;
     table_password?: string | null;
+    owner_user_id?: number | null;
   };
   members: TeamMember[];
   games: TeamGame[];
@@ -102,5 +103,26 @@ export function useTeamDetail(teamId: number | null | undefined) {
     };
   }, [teamId]);
 
-  return state;
+  const refetch = async () => {
+    if (teamId == null) return;
+    setState((prev) => ({ ...prev, loading: true, error: null, notFound: false }));
+    try {
+      const data = await getJson<TeamDetail>(`/event-teams/${teamId}`);
+      setState({ data, loading: false, error: null, notFound: false });
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 404) {
+        setState({ data: null, loading: false, error: null, notFound: true });
+      } else {
+        console.error('Failed to load team detail', err);
+        setState({
+          data: null,
+          loading: false,
+          error: 'Failed to load team. Please try again.',
+          notFound: false,
+        });
+      }
+    }
+  };
+
+  return { ...state, refetch };
 }

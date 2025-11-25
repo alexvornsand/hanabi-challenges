@@ -154,11 +154,11 @@ router.post('/:slug/register', authRequired, async (req: AuthenticatedRequest, r
 
     const teamResult = await client.query(
       `
-      INSERT INTO event_teams (event_id, name, team_size)
-      VALUES ($1, $2, $3)
-      RETURNING id, event_id, name, team_size, created_at;
+      INSERT INTO event_teams (event_id, name, team_size, owner_user_id)
+      VALUES ($1, $2, $3, $4)
+      RETURNING id, event_id, name, team_size, owner_user_id, created_at;
       `,
-      [eventId, team_name, sizeNum],
+      [eventId, team_name, sizeNum, currentUserId],
     );
     const team = teamResult.rows[0];
 

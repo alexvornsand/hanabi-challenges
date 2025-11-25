@@ -15,9 +15,11 @@ export function TeamPage() {
     return Number.isInteger(n) ? n : null;
   })();
 
-  const { data, loading, error, notFound } = useTeamDetail(parsedTeamId);
+  const { data, loading, error, notFound, refetch } = useTeamDetail(parsedTeamId);
   const { templates, loading: templatesLoading, error: templatesError } = useTeamTemplates(parsedTeamId);
   const { user, token } = useAuth();
+  const [leaveError, setLeaveError] = useState<string | null>(null);
+  const [leaving, setLeaving] = useState(false);
   const [drafts, setDrafts] = useState<Record<
     number,
     {
@@ -39,6 +41,17 @@ export function TeamPage() {
 
   const members = useMemo(() => data?.members ?? [], [data]);
   const isMember = useMemo(() => (user ? members.some((m) => m.user_id === user.id) : false), [user, members]);
+  const hasPlayed = useMemo(() => {
+    if (!user || !data?.games) return false;
+    return data.games.some((g) =>
+      (g.players ?? []).some((p) => p.display_name === user.display_name),
+    );
+  }, [data?.games, user]);
+  const canDeleteTeam =
+    user &&
+    data?.team.owner_user_id != null &&
+    user.id === data.team.owner_user_id &&
+    (data.games?.length ?? 0) === 0;
 
   const memberColorMap = useMemo(() => {
     const map: Record<string, { color: string; textColor: string }> = {};
@@ -136,6 +149,7 @@ export function TeamPage() {
           </span>
         </div>
       </header>
+      {leaveError && <p className="text-red-600 text-sm">{leaveError}</p>}
 
       <section
         style={{
@@ -322,6 +336,51 @@ export function TeamPage() {
           </div>
         )}
       </section>
+
+      {isMember && !hasPlayed && (
+        <div style={{ marginTop: 'var(--space-md)', display: 'flex', justifyContent: 'flex-start' }}>
+          <button
+            className="btn"
+            style={{ backgroundColor: '#dc2626', color: '#fff' }}
+            onClick={() => {
+              if (!token || !user) return;
+              const promptText = canDeleteTeam
+                ? 'Delete this team? This cannot be undone.'
+                : 'Leave this team? This cannot be undone.';
+              const confirmed = window.confirm(promptText);
+              if (!confirmed) return;
+              (async () => {
+                setLeaving(true);
+                setLeaveError(null);
+                try {
+                  const endpoint = canDeleteTeam
+                    ? `/api/event-teams/${data.team.id}`
+                    : `/api/event-teams/${data.team.id}/members/${user.id}`;
+                  const res = await fetch(endpoint, {
+                    method: 'DELETE',
+                    headers: { Authorization: `Bearer ${token}` },
+                  });
+                  if (!res.ok) {
+                    const body = await res.json().catch(() => ({}));
+                    setLeaveError(body.error || (canDeleteTeam ? 'Failed to delete team' : 'Failed to leave team'));
+                  } else {
+                    await refetch();
+                    window.location.href = `/events/${data.team.event_slug}`;
+                  }
+                } catch (err) {
+                  console.error('Failed to update team membership', err);
+                  setLeaveError(canDeleteTeam ? 'Failed to delete team' : 'Failed to leave team');
+                } finally {
+                  setLeaving(false);
+                }
+              })();
+            }}
+            disabled={leaving}
+          >
+            {leaving ? (canDeleteTeam ? 'Deleting…' : 'Leaving…') : canDeleteTeam ? 'Delete team' : 'Leave team'}
+          </button>
+        </div>
+      )}
     </main>
   );
 }

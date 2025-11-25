@@ -69,24 +69,22 @@ export const LandingPage: React.FC = () => {
           <div className="stack">
             {activeEvents.map((event) => (
               <div key={event.id} className="card" style={{ position: 'relative' }}>
-                <div
-                  className="flex items-center"
-                  style={{ gap: 'var(--space-sm)', paddingRight: '140px' }}
-                >
+                <h2 style={{ margin: 0, paddingRight: '140px', lineHeight: 1.3 }}>
                   <Link
                     to={`/events/${event.slug}`}
-                    className="text-lg font-semibold text-blue-700"
+                    className="text-2xl font-semibold text-blue-700 hover:underline"
                     style={{
                       flex: '1 1 auto',
                       minWidth: 0,
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
                       whiteSpace: 'nowrap',
+                      display: 'inline-block',
                     }}
                   >
                     {event.name}
                   </Link>
-                </div>
+                </h2>
                 <span
                   className="pill pill--accent text-sm whitespace-nowrap"
                   style={{ position: 'absolute', top: '12px', right: '12px' }}

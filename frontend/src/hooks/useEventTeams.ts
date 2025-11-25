@@ -7,6 +7,7 @@ export type EventTeam = {
   name: string;
   created_at: string;
   team_size: number;
+  owner_user_id?: number | null;
   completed_games?: number | null;
   perfect_games?: number | null;
   avg_bdr?: number | null;

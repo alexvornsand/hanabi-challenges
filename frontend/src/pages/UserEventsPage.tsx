@@ -63,52 +63,53 @@ export function UserEventsPage() {
   }, [username]);
 
   return (
-    <main className="p-4 space-y-4">
+    <main className="page stack">
       <div className="flex items-center gap-3">
-        <UserPill
-          name={displayName}
-          color={pillColor}
-          textColor={pillText}
-        />
+        <UserPill name={displayName} color={pillColor} textColor={pillText} />
         <h1 className="text-xl font-semibold">Events</h1>
       </div>
 
-      {loading && <p>Loading events...</p>}
-      {error && <p className="text-red-600">{error}</p>}
+      {loading && <div className="card"><p>Loading events...</p></div>}
+      {error && <div className="card"><p className="text-red-600">{error}</p></div>}
 
       {!loading && !error && events.length === 0 && (
-        <p className="text-gray-700">No teams found for this user.</p>
+        <div className="card">
+          <p className="text-gray-700">No teams found for this user.</p>
+        </div>
       )}
 
       {!loading && !error && events.length > 0 && (
-        <ul className="space-y-2">
+        <div className="grid md:grid-cols-2 gap-3">
           {events.map((ev) => (
-            <li key={ev.event_team_id} className="border rounded-lg p-3 bg-white/70 backdrop-blur-sm">
-              <div className="flex items-center justify-between">
-                <div>
-                  <Link to={`/events/${ev.event_slug}`} className="text-lg font-semibold text-blue-700">
-                    {ev.event_name}
-                  </Link>
-                  <p className="text-sm text-gray-700">
-                    Team:{' '}
-                    <Link
-                      to={`/events/${ev.event_slug}/teams/${ev.event_team_id}`}
-                      className="text-blue-700 underline"
-                    >
-                      {ev.team_name}
-                    </Link>
-                  </p>
-                  <p className="text-xs text-gray-500 uppercase tracking-wide">{ev.team_size}p team</p>
-                </div>
+            <div key={ev.event_team_id} className="card stack-xxs" style={{ marginBottom: 'var(--space-sm)' }}>
+              <h2 style={{ margin: 0, lineHeight: 1.3 }}>
+                <Link
+                  to={`/events/${ev.event_slug}`}
+                  className="text-2xl font-semibold text-blue-700 hover:underline"
+                >
+                  {ev.event_name}
+                </Link>
+              </h2>
+              <div className="text-sm text-gray-700">
+                Team:{' '}
+                <Link
+                  to={`/events/${ev.event_slug}/teams/${ev.event_team_id}`}
+                  className="text-blue-700 underline"
+                >
+                  {ev.team_name}
+                </Link>
               </div>
-            </li>
+              <p className="text-xs text-gray-500 uppercase tracking-wide">{ev.team_size}p team</p>
+            </div>
           ))}
-        </ul>
+        </div>
       )}
 
-      <Link className="text-blue-700 underline" to={`/users/${displayName}`}>
-        Back to profile
-      </Link>
+      <div>
+        <Link className="btn btn--secondary" to={`/users/${displayName}`}>
+          Back to profile
+        </Link>
+      </div>
     </main>
   );
 }

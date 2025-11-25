@@ -10,6 +10,7 @@ export interface EventTeam {
   team_size: number;
   created_at: string;
   table_password?: string | null;
+  owner_user_id?: number | null;
 }
 
 export interface EventTeamDetail extends EventTeam {
@@ -124,17 +125,18 @@ export async function createEventTeam(input: {
   event_id: number;
   name: string;
   team_size: number;
+  owner_user_id?: number | null;
 }): Promise<EventTeam> {
-  const { event_id, name, team_size } = input;
+  const { event_id, name, team_size, owner_user_id } = input;
 
   try {
     const teamResult = await pool.query(
       `
-      INSERT INTO event_teams (event_id, name, team_size)
-      VALUES ($1, $2, $3)
-      RETURNING id, event_id, name, team_size, created_at;
+      INSERT INTO event_teams (event_id, name, team_size, owner_user_id)
+      VALUES ($1, $2, $3, $4)
+      RETURNING id, event_id, name, team_size, owner_user_id, created_at;
       `,
-      [event_id, name, team_size],
+      [event_id, name, team_size, owner_user_id ?? null],
     );
 
     return teamResult.rows[0];
@@ -164,11 +166,11 @@ export async function createEventTeamWithCreator(input: {
 
     const teamResult = await client.query(
       `
-      INSERT INTO event_teams (event_id, name, team_size)
-      VALUES ($1, $2, $3)
-      RETURNING id, event_id, name, team_size, created_at;
+      INSERT INTO event_teams (event_id, name, team_size, owner_user_id)
+      VALUES ($1, $2, $3, $4)
+      RETURNING id, event_id, name, team_size, owner_user_id, created_at;
       `,
-      [event_id, name, team_size],
+      [event_id, name, team_size, creator_user_id],
     );
 
     const team = teamResult.rows[0];
@@ -266,6 +268,60 @@ export async function addPendingTeamMember(input: {
   return result.rows[0];
 }
 
+// Remove a member from a team
+export async function hasUserPlayedOnTeam(eventTeamId: number, userId: number): Promise<boolean> {
+  const result = await pool.query(
+    `
+    SELECT 1
+    FROM game_participants gp
+    JOIN event_games eg ON eg.id = gp.event_game_id
+    WHERE gp.user_id = $1 AND eg.event_team_id = $2
+    LIMIT 1;
+    `,
+    [userId, eventTeamId],
+  );
+  return result.rowCount > 0;
+}
+
+export async function hasTeamGames(eventTeamId: number): Promise<boolean> {
+  const result = await pool.query(
+    `
+    SELECT 1
+    FROM event_games
+    WHERE event_team_id = $1
+    LIMIT 1;
+    `,
+    [eventTeamId],
+  );
+  return result.rowCount > 0;
+}
+
+// Remove a member from a team (assumes caller authorized)
+export async function removeTeamMember(eventTeamId: number, userId: number): Promise<boolean> {
+  const result = await pool.query(
+    `
+    DELETE FROM team_memberships
+    WHERE event_team_id = $1 AND user_id = $2
+    RETURNING id;
+    `,
+    [eventTeamId, userId],
+  );
+
+  return result.rowCount > 0;
+}
+
+export async function deleteEventTeam(eventTeamId: number): Promise<boolean> {
+  const result = await pool.query(
+    `
+    DELETE FROM event_teams
+    WHERE id = $1
+    RETURNING id;
+    `,
+    [eventTeamId],
+  );
+  return result.rowCount > 0;
+}
+
 // List candidate members for a team (users not yet on team, optional prefix filter)
 export async function listMemberCandidates(
   eventTeamId: number,
@@ -327,6 +383,7 @@ export async function getEventTeamDetail(eventTeamId: number): Promise<EventTeam
       t.name,
       t.team_size,
       t.table_password,
+      t.owner_user_id,
       t.created_at,
       e.slug AS event_slug,
       e.name AS event_name

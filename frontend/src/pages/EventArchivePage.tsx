@@ -65,21 +65,22 @@ export const EventArchivePage: React.FC = () => {
                   borderStyle: unpublished ? 'dashed' : 'solid',
                 }}
               >
-                <div className="flex items-center" style={{ gap: 'var(--space-sm)' }}>
+                <h2 style={{ margin: 0 }}>
                   <Link
                     to={`/events/${event.slug}`}
-                    className="text-lg font-semibold text-blue-700"
+                    className="text-2xl font-semibold text-blue-700 hover:underline"
                     style={{
                       flex: '1 1 auto',
                       minWidth: 0,
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
                       whiteSpace: 'nowrap',
+                      display: 'inline-block',
                     }}
                   >
                     {event.name}
                   </Link>
-                </div>
+                </h2>
                 <div
                   style={{
                     position: 'absolute',
