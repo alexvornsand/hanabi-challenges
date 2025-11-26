@@ -364,7 +364,12 @@ function RegisterModal({
       >
         <div
           className="card"
-          style={{ padding: 'var(--space-md)', maxWidth: '480px', width: '100%', boxShadow: '0 10px 30px rgba(0,0,0,0.15)' }}
+          style={{
+            padding: 'var(--space-md)',
+            maxWidth: '480px',
+            width: '100%',
+            boxShadow: '0 10px 30px rgba(0,0,0,0.15)',
+          }}
         >
           <div className="space-y-3" style={{ position: 'relative' }}>
             <button

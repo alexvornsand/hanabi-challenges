@@ -1,0 +1,52 @@
+.ui-upload-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xxs);
+  width: 100%;
+}
+
+.ui-upload-label {
+  font-size: var(--font-small-size);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.ui-upload-control {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--input-padding-y) var(--input-padding-x);
+  border: 1px solid var(--color-border);
+  border-radius: var(--input-radius);
+  background: var(--color-surface);
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.ui-upload-control:hover {
+  border-color: rgba(0, 0, 0, 0.12);
+}
+
+.ui-upload-control:focus-within {
+  outline: none;
+  border-color: var(--color-accent-strong);
+  box-shadow: var(--input-focus-shadow);
+}
+
+.ui-upload-control--error {
+  border-color: var(--color-sem-negative-text);
+  color: var(--color-sem-negative-text);
+}
+
+.ui-upload-input {
+  display: none;
+}
+
+.ui-upload-helper {
+  font-size: var(--font-small-size);
+  color: var(--color-text-muted);
+}
+
+.ui-upload-helper--error {
+  color: var(--color-sem-negative-text);
+}

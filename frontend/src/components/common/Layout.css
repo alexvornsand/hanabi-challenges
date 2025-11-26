@@ -1,0 +1,10 @@
+.ui-container {
+  max-width: var(--max-width-page);
+  margin: 0 auto;
+  padding: var(--page-padding);
+}
+
+.ui-stack {
+  display: flex;
+  flex-direction: column;
+}
