@@ -2,6 +2,8 @@ BEGIN;
 
 -- Wipe existing data (and reset sequences)
 TRUNCATE TABLE
+  event_badge_awards,
+  event_badges,
   pending_team_members,
   event_stage_team_statuses,
   game_participants,
@@ -174,6 +176,73 @@ VALUES
   (4, 4, 'PLAYER', true),  -- donald
   (4, 5, 'PLAYER', true),  -- emily
   (4, 7, 'PLAYER', true);  -- grace
+
+
+-- ================================
+-- Event badges
+-- ================================
+-- All badges use icon "f612" for now.
+
+INSERT INTO event_badges (event_id, name, description, icon, rank, team_size)
+VALUES
+  (1, 'Spring Circuit 2p Champion',     'First place 2-player teams for Spring Circuit 2025.',              'f612', '1',           2),
+  (1, 'Spring Circuit 2p Silver',       'Second place 2-player teams for Spring Circuit 2025.',             'f612', '2',           2),
+  (1, 'Spring Circuit 2p Bronze',       'Third place 2-player teams for Spring Circuit 2025.',              'f612', '3',           2),
+  (1, 'Spring Circuit 2p Completion',   'Completed all Spring Circuit 2025 seeds before the deadline (2p).','f612', 'completion',  2),
+  (1, 'Spring Circuit 3p Champion',     'First place 3-player teams for Spring Circuit 2025.',              'f612', '1',           3),
+  (1, 'Spring Circuit 3p Silver',       'Second place 3-player teams for Spring Circuit 2025.',             'f612', '2',           3),
+  (1, 'Spring Circuit 3p Bronze',       'Third place 3-player teams for Spring Circuit 2025.',              'f612', '3',           3),
+  (1, 'Spring Circuit 3p Completion',   'Completed all Spring Circuit 2025 seeds before the deadline (3p).','f612', 'completion',  3),
+  (2, 'Summer Sprint 3p Champion',      'First place 3-player teams for Summer Sprint 2025.',               'f612', '1',           3),
+  (2, 'Summer Sprint 3p Completion',    'Completed all Summer Sprint 2025 seeds before the deadline (3p).', 'f612', 'completion',  3),
+  (2, 'Summer Sprint 4p Champion',      'First place 4-player teams for Summer Sprint 2025.',               'f612', '1',           4),
+  (2, 'Summer Sprint 4p Completion',    'Completed all Summer Sprint 2025 seeds before the deadline (4p).', 'f612', 'completion',  4);
+
+-- event_badge ids:
+-- 1..4   -> Spring Circuit 2025 (2p)
+-- 5..8   -> Spring Circuit 2025 (3p)
+-- 9..10  -> Summer Sprint 2025 (3p)
+-- 11..12 -> Summer Sprint 2025 (4p)
+
+
+-- ================================
+-- Event badge awards
+-- ================================
+
+-- Lanterns (event_team_id 1, 2p) earned champion + completion
+INSERT INTO event_badge_awards (event_badge_id, team_id, user_id)
+VALUES
+  (1, 1, 2),  -- bob
+  (1, 1, 3),  -- cathy
+  (1, 1, 4),  -- donald
+  (4, 1, 2),  -- bob
+  (4, 1, 3),  -- cathy
+  (4, 1, 4);  -- donald
+
+-- Clue Crew (event_team_id 2, 3p) earned completion
+INSERT INTO event_badge_awards (event_badge_id, team_id, user_id)
+VALUES
+  (8, 2, 2),  -- bob
+  (8, 2, 5),  -- emily
+  (8, 2, 6);  -- frank
+
+-- Risky Fuses (event_team_id 4, 3p) won Summer Sprint champion + completion
+INSERT INTO event_badge_awards (event_badge_id, team_id, user_id)
+VALUES
+  (9, 4, 4),  -- donald
+  (9, 4, 5),  -- emily
+  (9, 4, 7),  -- grace
+  (10, 4, 4), -- donald
+  (10, 4, 5), -- emily
+  (10, 4, 7); -- grace
+
+-- Faded Signals (event_team_id 3, 4p) earned completion
+INSERT INTO event_badge_awards (event_badge_id, team_id, user_id)
+VALUES
+  (12, 3, 1), -- alice
+  (12, 3, 5), -- emily
+  (12, 3, 6), -- frank
+  (12, 3, 7); -- grace
 
 
 -- ================================

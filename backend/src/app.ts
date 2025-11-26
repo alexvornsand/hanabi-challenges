@@ -15,7 +15,8 @@ app.use((req, res, next) => {
   const shouldLogBody =
     req.originalUrl.startsWith('/api/events') ||
     req.originalUrl.startsWith('/api/event-teams') ||
-    req.originalUrl.startsWith('/api/results');
+    req.originalUrl.startsWith('/api/results') ||
+    req.originalUrl.startsWith('/api/users');
 
   if (shouldLogBody) {
     console.log('[req:details]', {

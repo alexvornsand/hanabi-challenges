@@ -2,6 +2,8 @@
 CREATE EXTENSION IF NOT EXISTS citext;
 
 DROP TABLE IF EXISTS pending_team_members CASCADE;
+DROP TABLE IF EXISTS event_badge_awards CASCADE;
+DROP TABLE IF EXISTS event_badges CASCADE;
 DROP TABLE IF EXISTS event_stage_team_statuses CASCADE;
 DROP TABLE IF EXISTS game_participants CASCADE;
 DROP TABLE IF EXISTS event_games CASCADE;
@@ -167,4 +169,34 @@ CREATE TABLE event_stage_team_statuses (
   metadata_json JSONB DEFAULT '{}'::jsonb,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   PRIMARY KEY (event_stage_id, event_team_id)
+);
+
+------------------------------------------------------------
+-- EVENT BADGES
+-- Badge definitions scoped to a single event and team size
+------------------------------------------------------------
+
+CREATE TABLE event_badges (
+  id SERIAL PRIMARY KEY,
+  event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  description TEXT NOT NULL,
+  icon TEXT NOT NULL,
+  rank TEXT NOT NULL CHECK (rank IN ('1', '2', '3', 'completion', 'participation')),
+  team_size INTEGER NOT NULL CHECK (team_size IN (2, 3, 4, 5, 6)),
+  UNIQUE (event_id, rank, team_size)
+);
+
+------------------------------------------------------------
+-- EVENT BADGE AWARDS
+-- Award facts fan-out to users (one row per user)
+------------------------------------------------------------
+
+CREATE TABLE event_badge_awards (
+  id SERIAL PRIMARY KEY,
+  event_badge_id INTEGER NOT NULL REFERENCES event_badges(id) ON DELETE CASCADE,
+  team_id INTEGER NOT NULL REFERENCES event_teams(id) ON DELETE CASCADE,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  awarded_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE (event_badge_id, user_id)
 );
