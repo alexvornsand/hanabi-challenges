@@ -1,5 +1,6 @@
 // src/modules/teams/team.routes.ts
 import { Router, Request, Response } from 'express';
+import { pool } from '../../config/db';
 import {
   listTeamMembers,
   createEventTeam,
@@ -14,12 +15,55 @@ import {
   removeTeamMember,
   deleteEventTeam,
 } from './team.service';
-import { authRequired, AuthenticatedRequest } from '../../middleware/authMiddleware';
+import { authOptional, authRequired, AuthenticatedRequest } from '../../middleware/authMiddleware';
+import {
+  findEligibilityForUsers,
+  upsertEnrolledIfMissing,
+} from '../events/event-eligibility.service';
+
+async function checkEligibilityGate(options: {
+  teamSize: number;
+  eventId: number;
+  teamName: string;
+  eventSlug: string;
+  viewerId: number | null;
+}) {
+  const { teamSize, eventId, teamName, eventSlug, viewerId } = options;
+  if (!viewerId) {
+    return {
+      allowed: false,
+      status: 'login' as const,
+      body: { error: 'Login required to view spoilers', team_size: teamSize, event_slug: eventSlug, team_name: teamName, status: 'LOGIN_REQUIRED' },
+    };
+  }
+
+  const eligibility = await findEligibilityForUsers({
+    eventId,
+    teamSize,
+    userIds: [viewerId],
+  });
+  const entry = eligibility[0];
+  if (entry?.status === 'INELIGIBLE' || entry?.status === 'COMPLETED') {
+    return { allowed: true };
+  }
+  if (entry?.status === 'ENROLLED') {
+    return {
+      allowed: false,
+      status: 'blocked' as const,
+      body: { error: 'Enrolled users cannot view spoilers', team_size: teamSize, event_slug: eventSlug, team_name: teamName, status: 'ENROLLED' },
+    };
+  }
+  return {
+    allowed: false,
+    status: 'prompt' as const,
+    body: { error: 'Forfeit eligibility required to view spoilers', team_size: teamSize, event_slug: eventSlug, team_name: teamName, status: 'REQUIRES_FORFEIT' },
+  };
+}
 
 const router = Router();
 
 // GET /api/event-teams/:id
-router.get('/:id', async (req: Request, res: Response) => {
+router.get('/:id', authOptional, async (req: AuthenticatedRequest, res: Response) => {
   const eventTeamId = Number(req.params.id);
 
   if (Number.isNaN(eventTeamId)) {
@@ -34,11 +78,24 @@ router.get('/:id', async (req: Request, res: Response) => {
       return;
     }
 
-    const [members, games] = await Promise.all([
-      listTeamMembers(eventTeamId),
-      listTeamGames(eventTeamId),
-    ]);
+    const viewerId = req.user?.userId ?? null;
+    const members = await listTeamMembers(eventTeamId);
+    const isMember = viewerId != null ? members.some((m) => m.user_id === viewerId) : false;
+    if (!isMember) {
+      const gate = await checkEligibilityGate({
+        teamSize: team.team_size,
+        eventId: team.event_id,
+        teamName: team.name,
+        eventSlug: team.event_slug,
+        viewerId,
+      });
+      if (!gate.allowed) {
+        const code = gate.status === 'login' ? 401 : 403;
+        return res.status(code).json(gate.body);
+      }
+    }
 
+    const games = await listTeamGames(eventTeamId);
     res.json({ team, members, games });
   } catch (err) {
     console.error('Error fetching team detail:', err);
@@ -47,7 +104,7 @@ router.get('/:id', async (req: Request, res: Response) => {
 });
 
 // GET /api/event-teams/:id/templates
-router.get('/:id/templates', async (req: Request, res: Response) => {
+router.get('/:id/templates', authOptional, async (req: AuthenticatedRequest, res: Response) => {
   const eventTeamId = Number(req.params.id);
 
   if (Number.isNaN(eventTeamId)) {
@@ -59,6 +116,23 @@ router.get('/:id/templates', async (req: Request, res: Response) => {
     const team = await getEventTeamDetail(eventTeamId);
     if (!team) {
       return res.status(404).json({ error: 'Team not found' });
+    }
+
+    const viewerId = req.user?.userId ?? null;
+    const teamMembers = await listTeamMembers(eventTeamId);
+    const isMember = viewerId != null ? teamMembers.some((m) => m.user_id === viewerId) : false;
+    if (!isMember) {
+      const gate = await checkEligibilityGate({
+        teamSize: team.team_size,
+        eventId: team.event_id,
+        teamName: team.name,
+        eventSlug: team.event_slug,
+        viewerId,
+      });
+      if (!gate.allowed) {
+        const code = gate.status === 'login' ? 401 : 403;
+        return res.status(code).json(gate.body);
+      }
     }
 
     const templates = await listTeamTemplatesWithResults(eventTeamId);
@@ -155,6 +229,12 @@ router.post('/:id/members', authRequired, async (req: AuthenticatedRequest, res:
     return;
   }
 
+  const targetUserId = Number(user_id);
+  if (!Number.isInteger(targetUserId)) {
+    res.status(400).json({ error: 'user_id must be an integer' });
+    return;
+  }
+
   if (role !== 'PLAYER' && role !== 'STAFF') {
     res.status(400).json({
       error: "role must be either 'PLAYER' or 'STAFF'",
@@ -176,11 +256,80 @@ router.post('/:id/members', authRequired, async (req: AuthenticatedRequest, res:
       return;
     }
 
+    const eligibilityRows = await findEligibilityForUsers({
+      eventId: team.event_id,
+      teamSize: team.team_size,
+      userIds: [targetUserId],
+    });
+    if (eligibilityRows.length > 0) {
+      const entry = eligibilityRows[0];
+      const reason =
+        entry.status === 'ENROLLED'
+          ? 'already enrolled'
+          : entry.status === 'COMPLETED'
+            ? 'already completed'
+            : 'ineligible (spoilers)';
+      res.status(409).json({
+        error: `${entry.display_name ?? 'User'} cannot join this team (${reason})`,
+      });
+      return;
+    }
+
+    const legacyConflict = await pool.query(
+      `
+      SELECT 1
+      FROM team_memberships tm
+      JOIN event_teams et ON et.id = tm.event_team_id
+      WHERE et.event_id = $1
+        AND et.team_size = $2
+        AND tm.user_id = $3
+      LIMIT 1;
+      `,
+      [team.event_id, team.team_size, targetUserId],
+    );
+    if (legacyConflict.rowCount > 0) {
+      await upsertEnrolledIfMissing({
+        eventId: team.event_id,
+        teamSize: team.team_size,
+        userId: targetUserId,
+        sourceEventTeamId: eventTeamId,
+      }).catch((err) => {
+        console.warn('Failed to backfill eligibility entry', {
+          eventId: team.event_id,
+          teamSize: team.team_size,
+          userId: targetUserId,
+          eventTeamId,
+          err,
+        });
+        return null;
+      });
+      res.status(409).json({
+        error: 'This user already has a team for this event and team size',
+      });
+      return;
+    }
+
     const member = await addTeamMember({
       event_team_id: eventTeamId,
-      user_id,
+      user_id: targetUserId,
       role: role as TeamRole,
       is_listed,
+    });
+
+    await upsertEnrolledIfMissing({
+      eventId: team.event_id,
+      teamSize: team.team_size,
+      userId: targetUserId,
+      sourceEventTeamId: eventTeamId,
+    }).catch((err) => {
+      console.warn('Failed to record eligibility entry after adding member', {
+        eventId: team.event_id,
+        teamSize: team.team_size,
+        userId: targetUserId,
+        eventTeamId,
+        err,
+      });
+      return null;
     });
 
     res.status(201).json(member);

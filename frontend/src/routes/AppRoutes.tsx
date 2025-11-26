@@ -17,6 +17,7 @@ import { AdminHomePage } from '../pages/admin/AdminHomePage';
 import { AdminCreateEventPage } from '../pages/admin/AdminCreateEventPage';
 import { AdminManageUsersPage } from '../pages/admin/AdminManageUsersPage';
 import { NotFoundPage } from '../pages/NotFoundPage';
+import { EventStatsPage } from '../pages/EventStatsPage';
 
 export function AppRoutes() {
   return (
@@ -34,6 +35,7 @@ export function AppRoutes() {
             <Route path=":slug" element={<EventDetailPage />} />
             <Route path=":slug/:teamSize" element={<EventDetailPage />} />
             <Route path=":slug/teams/:teamId" element={<TeamPage />} />
+            <Route path=":slug/stats" element={<EventStatsPage />} />
           </Route>
 
           {/* Auth */}

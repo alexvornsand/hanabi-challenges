@@ -32,6 +32,10 @@ export function EventDetailPage() {
     error: teamsError,
     refetch: refetchTeams,
   } = useEventTeams(slug);
+  const totalGamesPlayed = useMemo(
+    () => (teams ?? []).reduce((sum, t) => sum + (Number(t.completed_games) || 0), 0),
+    [teams],
+  );
   if (notFound) {
     return <NotFoundPage />;
   }
@@ -69,7 +73,7 @@ export function EventDetailPage() {
 
   return (
     <main className="page">
-      <header className="card" style={{ padding: 'var(--space-md)' }}>
+      <header className="card" style={{ padding: 'var(--space-md)', position: 'relative' }}>
         <div className="stack-sm" style={{ flex: '1 1 auto' }}>
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold" style={{ margin: 0 }}>{event.name}</h1>
@@ -87,6 +91,21 @@ export function EventDetailPage() {
             </div>
           )}
         </div>
+        {teamsLoading ? null : totalGamesPlayed > 0 ? (
+          <div
+            style={{
+              position: 'absolute',
+              top: 'var(--space-sm)',
+              right: 'var(--space-sm)',
+              display: 'flex',
+              gap: '8px',
+            }}
+          >
+            <Link to={`/events/${event.slug}/stats`} className="btn btn--secondary">
+              View Stats
+            </Link>
+          </div>
+        ) : null}
         {event.long_description && (
           <div
             className="text-gray-800"
@@ -214,7 +233,6 @@ export function EventDetailPage() {
           }}
         />
       )}
-
       {registerError && (
         <div className="border rounded-md p-3 bg-white/70">
           <p className="text-red-600">{registerError}</p>
@@ -328,17 +346,58 @@ function RegisterModal({
 
   if (!user) {
     return (
-      <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4">
-        <div className="bg-white rounded-lg p-4 space-y-3 max-w-md w-full">
-          <h2 className="text-xl font-semibold">Log in to register</h2>
-          <p className="text-gray-700">You need to log in before registering a team.</p>
-          <div className="flex gap-2 justify-end">
-            <button className="px-3 py-2 rounded border" onClick={onClose}>
-              Cancel
+      <div
+        style={{
+          position: 'fixed',
+          inset: 0,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '16px',
+          zIndex: 2000,
+          background: 'rgba(0,0,0,0.25)',
+          backdropFilter: 'blur(2px)',
+        }}
+        onClick={(e) => {
+          if (e.target === e.currentTarget) onClose();
+        }}
+      >
+        <div
+          className="card"
+          style={{ padding: 'var(--space-md)', maxWidth: '480px', width: '100%', boxShadow: '0 10px 30px rgba(0,0,0,0.15)' }}
+        >
+          <div className="space-y-3" style={{ position: 'relative' }}>
+            <button
+              onClick={onClose}
+              aria-label="Close"
+              style={{
+                position: 'absolute',
+                top: '6px',
+                right: '6px',
+                border: 'none',
+                background: 'transparent',
+                cursor: 'pointer',
+                fontSize: '16px',
+                lineHeight: 1,
+              }}
+            >
+              ×
             </button>
-            <Link to="/login" className="px-3 py-2 rounded bg-blue-600 text-white font-semibold text-center">
-              Go to login
-            </Link>
+            <h2 className="text-xl font-semibold" style={{ margin: 0, marginBottom: '0.5rem' }}>
+              Log in to register
+            </h2>
+            <p className="text-gray-700" style={{ margin: 0, marginBottom: '0.9rem' }}>
+              You need to log in before registering a team.
+            </p>
+            <div className="flex gap-2 justify-start">
+              <Link
+                to="/login"
+                className="btn btn--primary"
+                style={{ padding: '10px 14px', textDecoration: 'none' }}
+              >
+                Go to login
+              </Link>
+            </div>
           </div>
         </div>
       </div>

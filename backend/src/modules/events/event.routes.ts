@@ -11,6 +11,13 @@ import {
   createEventStage,
   updateEventBySlug,
 } from './event.service';
+import {
+  findEligibilityForUsers,
+  listEligibilityForUser,
+  markIneligible,
+  upsertEnrolledIfMissing,
+  hasBlockingStatus,
+} from './event-eligibility.service';
 import { pool } from '../../config/db';
 import { listTeamMembers } from '../teams/team.service';
 import { validateSlug } from '../../utils/slug';
@@ -66,6 +73,123 @@ router.get('/', authOptional, async (req: AuthenticatedRequest, res: Response) =
     res.status(500).json({ error: 'Failed to fetch events' });
   }
 });
+
+/* ------------------------------------------
+ *  GET /api/events/:slug/eligibility/me
+ *  Return ineligibility rows for the current user (optionally filtered by team_size)
+ * ----------------------------------------*/
+router.get('/:slug/eligibility/me', authRequired, async (req: AuthenticatedRequest, res: Response) => {
+  const { slug } = req.params;
+  const teamSizeRaw = (req.query.team_size as string | undefined) ?? (req.query.teamSize as string | undefined);
+  const teamSize = teamSizeRaw != null ? Number(teamSizeRaw) : null;
+
+  if (teamSizeRaw != null && (!Number.isInteger(teamSize) || teamSize < 2 || teamSize > 6)) {
+    return res.status(400).json({ error: 'team_size must be an integer between 2 and 6' });
+  }
+
+  try {
+    const eventId = await getEventId(slug);
+    if (!eventId) return res.status(404).json({ error: 'Event not found' });
+
+    const entries = await listEligibilityForUser({
+      eventId,
+      userId: req.user!.userId,
+      teamSize: teamSize ?? undefined,
+    });
+
+    res.json(entries);
+  } catch (err) {
+    console.error('Error fetching eligibility:', err);
+    res.status(500).json({ error: 'Failed to fetch eligibility' });
+  }
+});
+
+/* ------------------------------------------
+ *  POST /api/events/:slug/eligibility/spoilers
+ *  Mark the current user as ineligible for a team size due to spoilers
+ * ----------------------------------------*/
+router.post(
+  '/:slug/eligibility/spoilers',
+  authRequired,
+  async (req: AuthenticatedRequest, res: Response) => {
+    const { slug } = req.params;
+    const { team_size, teamSize, source_event_team_id, sourceEventTeamId, reason, all_team_sizes, allTeamSizes } =
+      req.body ?? {};
+
+    const applyAll = Boolean(all_team_sizes ?? allTeamSizes);
+    const sizeValue = applyAll ? null : team_size ?? teamSize;
+    const parsedSize = sizeValue != null ? Number(sizeValue) : null;
+    if (!applyAll && (parsedSize == null || !Number.isInteger(parsedSize) || parsedSize < 2 || parsedSize > 6)) {
+      return res.status(400).json({ error: 'team_size must be an integer between 2 and 6' });
+    }
+
+    const sourceTeamIdRaw = source_event_team_id ?? sourceEventTeamId;
+    const sourceTeamId = sourceTeamIdRaw != null ? Number(sourceTeamIdRaw) : null;
+
+    try {
+      const eventId = await getEventId(slug);
+      if (!eventId) return res.status(404).json({ error: 'Event not found' });
+
+      if (sourceTeamId != null && parsedSize != null) {
+        const teamCheck = await pool.query<{ event_id: number; team_size: number }>(
+          `SELECT event_id, team_size FROM event_teams WHERE id = $1`,
+          [sourceTeamId],
+        );
+        const teamRow = teamCheck.rows[0];
+        if (!teamRow || teamRow.event_id !== eventId) {
+          return res.status(400).json({ error: 'source_event_team_id must belong to this event' });
+        }
+        if (teamRow && teamRow.team_size !== parsedSize) {
+          return res
+            .status(400)
+            .json({ error: `source_event_team_id is a ${teamRow.team_size}p team, not ${parsedSize}p` });
+        }
+      }
+
+      const userId = req.user!.userId;
+      const sizesToApply = applyAll ? [2, 3, 4, 5, 6] : [parsedSize!];
+
+      const existingRows = await listEligibilityForUser({
+        eventId,
+        userId,
+      });
+
+      // Block if any enrolled exists and we are applying to all, or if the specific size is enrolled
+      if (applyAll) {
+        if (hasBlockingStatus(existingRows.filter((r) => sizesToApply.includes(r.team_size)), 'ENROLLED')) {
+          return res.status(403).json({ error: 'Cannot view spoilers while enrolled for any team size' });
+        }
+      } else {
+        const existingForSize = existingRows.find((r) => r.team_size === parsedSize);
+        if (existingForSize?.status === 'ENROLLED') {
+          return res.status(403).json({ error: 'Cannot view spoilers while enrolled for this team size' });
+        }
+      }
+
+      const results = [];
+      for (const size of sizesToApply) {
+        const current = existingRows.find((r) => r.team_size === size);
+        if (current && (current.status === 'INELIGIBLE' || current.status === 'COMPLETED')) {
+          results.push(current);
+          continue;
+        }
+        const updated = await markIneligible({
+          eventId,
+          teamSize: size,
+          userId,
+          sourceEventTeamId: sourceTeamId,
+          reason: typeof reason === 'string' ? reason : undefined,
+        });
+        results.push(updated);
+      }
+
+      res.status(201).json({ updated: results });
+    } catch (err) {
+      console.error('Error marking spoiler ineligibility:', err);
+      res.status(500).json({ error: 'Failed to update eligibility' });
+    }
+  },
+);
 
 /* ------------------------------------------
  *  GET /api/events/:slug/memberships
@@ -227,11 +351,43 @@ router.post('/:slug/register', authRequired, async (req: AuthenticatedRequest, r
     }
 
     // Check if any member already has a team in this event with the same size
-    const memberUserIds = memberEntries.map((m) => m.user_id).filter((id) => id != null) as number[];
+    const memberUserIds = Array.from(
+      new Set(
+        memberEntries
+          .map((m) => (m.user_id != null ? Number(m.user_id) : null))
+          .filter((id): id is number => id != null),
+      ),
+    );
     if (memberUserIds.length > 0) {
+      const eligibilityRows = await findEligibilityForUsers({
+        eventId,
+        teamSize: sizeNum,
+        userIds: memberUserIds,
+        client,
+      });
+
+      if (eligibilityRows.length > 0) {
+        await client.query('ROLLBACK');
+        const conflictList = eligibilityRows
+          .map((row) => {
+            const reason =
+              row.status === 'ENROLLED'
+                ? 'already enrolled'
+                : row.status === 'COMPLETED'
+                  ? 'already completed'
+                  : 'ineligible (spoilers)';
+            return `${row.display_name ?? `User ${row.user_id}`} (${reason})`;
+          })
+          .join(', ');
+        return res.status(409).json({
+          error: `These users cannot register for ${sizeNum}p in this event: ${conflictList}`,
+        });
+      }
+
+      // Fallback to legacy membership table in case historical data hasn't populated the new eligibility table yet
       const conflictCheck = await client.query(
         `
-        SELECT DISTINCT u.display_name
+        SELECT DISTINCT u.display_name, tm.user_id, et.id AS event_team_id
         FROM team_memberships tm
         JOIN event_teams et ON et.id = tm.event_team_id
         JOIN users u ON u.id = tm.user_id
@@ -242,10 +398,31 @@ router.post('/:slug/register', authRequired, async (req: AuthenticatedRequest, r
         [eventId, sizeNum, memberUserIds],
       );
       if (conflictCheck.rowCount > 0) {
+        // Backfill the new table so future checks use it
+        await Promise.all(
+          conflictCheck.rows.map((row: { user_id: number; event_team_id: number }) =>
+            upsertEnrolledIfMissing({
+              eventId,
+              teamSize: sizeNum,
+              userId: row.user_id,
+              sourceEventTeamId: row.event_team_id,
+            }).catch((err) => {
+              console.warn('Failed to backfill eligibility entry', {
+                eventId,
+                teamSize: sizeNum,
+                userId: row.user_id,
+                eventTeamId: row.event_team_id,
+                err,
+              });
+              return null;
+            }),
+          ),
+        );
+
         await client.query('ROLLBACK');
         return res.status(409).json({
           error: `These users already have a ${sizeNum}p team for this event: ${conflictCheck
-            .rows.map((r) => r.display_name)
+            .rows.map((r: { display_name: string }) => r.display_name)
             .join(', ')}`,
         });
       }
@@ -263,17 +440,19 @@ router.post('/:slug/register', authRequired, async (req: AuthenticatedRequest, r
 
     const addedMembers: unknown[] = [];
     const pendingMembers: unknown[] = [];
+    const registeredUserIds = new Set<number>();
 
     for (const m of memberEntries) {
       const role = m.role === 'STAFF' ? 'STAFF' : 'PLAYER';
       if (m.user_id) {
+        const userIdNum = Number(m.user_id);
         const memberResult = await client.query(
           `
           INSERT INTO team_memberships (event_team_id, user_id, role, is_listed)
           VALUES ($1, $2, $3, true)
           RETURNING id, event_team_id, user_id, role, is_listed, created_at;
           `,
-          [team.id, Number(m.user_id), role],
+          [team.id, userIdNum, role],
         );
         const memberRow = memberResult.rows[0];
 
@@ -293,6 +472,17 @@ router.post('/:slug/register', authRequired, async (req: AuthenticatedRequest, r
         };
 
         addedMembers.push({ ...memberRow, ...userInfo });
+
+        if (!registeredUserIds.has(userIdNum)) {
+          await upsertEnrolledIfMissing({
+            eventId,
+            teamSize: sizeNum,
+            userId: userIdNum,
+            sourceEventTeamId: team.id,
+            client,
+          });
+          registeredUserIds.add(userIdNum);
+        }
       } else if (m.display_name) {
         const pendingResult = await client.query(
           `
@@ -865,6 +1055,52 @@ router.get('/:slug/teams', async (req: Request, res: Response) => {
   } catch (err) {
     console.error('Error fetching teams:', err);
     res.status(500).json({ error: 'Failed to fetch teams' });
+  }
+});
+
+/* ------------------------------------------
+ *  GET /api/events/:slug/stats
+ *  Aggregated per-template stats for an event (filtered by team_size)
+ * ----------------------------------------*/
+router.get('/:slug/stats', async (req: Request, res: Response) => {
+  const { slug } = req.params;
+  const teamSizeRaw = (req.query.team_size as string | undefined) ?? (req.query.teamSize as string | undefined);
+  const teamSize = teamSizeRaw != null ? Number(teamSizeRaw) : null;
+  if (teamSizeRaw != null && (!Number.isInteger(teamSize) || teamSize < 2 || teamSize > 6)) {
+    return res.status(400).json({ error: 'team_size must be an integer between 2 and 6' });
+  }
+
+  try {
+    const eventId = await getEventId(slug);
+    if (!eventId) return res.status(404).json({ error: 'Event not found' });
+
+    const result = await pool.query(
+      `
+      SELECT
+        egt.id AS template_id,
+        egt.template_index,
+        egt.seed_payload,
+        egt.variant,
+        egt.max_score,
+        COALESCE(AVG(g.score)::numeric, 0) AS avg_score,
+        COALESCE(AVG(g.bottom_deck_risk)::numeric, 0) AS avg_bdr,
+        COALESCE(AVG(CASE WHEN egt.max_score IS NOT NULL AND g.score = egt.max_score THEN 1 ELSE 0 END)::numeric, 0) AS avg_win_rate,
+        COUNT(g.id) AS games_played
+      FROM event_game_templates egt
+      JOIN event_stages es ON es.event_stage_id = egt.event_stage_id
+      LEFT JOIN event_games g ON g.event_game_template_id = egt.id
+      LEFT JOIN event_teams t ON t.id = g.event_team_id AND ($2::int IS NULL OR t.team_size = $2::int)
+      WHERE es.event_id = $1
+      GROUP BY egt.id, egt.template_index, egt.seed_payload, egt.variant, egt.max_score
+      ORDER BY egt.template_index;
+      `,
+      [eventId, teamSize],
+    );
+
+    res.json({ templates: result.rows });
+  } catch (err) {
+    console.error('Error fetching event stats:', err);
+    res.status(500).json({ error: 'Failed to fetch event stats' });
   }
 });
 

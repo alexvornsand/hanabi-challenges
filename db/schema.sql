@@ -8,6 +8,7 @@ DROP TABLE IF EXISTS event_stage_team_statuses CASCADE;
 DROP TABLE IF EXISTS game_participants CASCADE;
 DROP TABLE IF EXISTS event_games CASCADE;
 DROP TABLE IF EXISTS event_game_templates CASCADE;
+DROP TABLE IF EXISTS event_player_eligibilities CASCADE;
 DROP TABLE IF EXISTS team_memberships CASCADE;
 DROP TABLE IF EXISTS event_teams CASCADE;
 DROP TABLE IF EXISTS event_stages CASCADE;
@@ -62,6 +63,26 @@ CREATE TABLE event_teams (
   table_password TEXT,
   UNIQUE (event_id, name)
 );
+
+------------------------------------------------------------
+-- EVENT PLAYER ELIGIBILITY
+-- Tracks eligibility per event/team_size and whether spoilers are allowed
+------------------------------------------------------------
+
+CREATE TABLE event_player_eligibilities (
+  event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  team_size INTEGER NOT NULL CHECK (team_size IN (2, 3, 4, 5, 6)),
+  status TEXT NOT NULL CHECK (status IN ('ENROLLED', 'INELIGIBLE', 'COMPLETED')),
+  source_event_team_id INTEGER REFERENCES event_teams(id) ON DELETE SET NULL,
+  status_reason TEXT,
+  changed_at TIMESTAMPTZ DEFAULT NOW(),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  PRIMARY KEY (event_id, user_id, team_size)
+);
+
+CREATE INDEX idx_event_player_eligibilities_lookup
+  ON event_player_eligibilities (event_id, team_size);
 
 ------------------------------------------------------------
 -- TEAM MEMBERSHIPS (players + managers)

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { ApiError, getJson } from '../lib/api';
+import { ApiError, getJson, getJsonAuth } from '../lib/api';
+import { useAuth } from '../context/AuthContext';
 
 export type TeamMember = {
   id: number;
@@ -51,18 +52,28 @@ export type TeamDetail = {
   games: TeamGame[];
 };
 
+export type TeamGate = {
+  mode: 'login' | 'blocked' | 'prompt';
+  event_slug: string;
+  team_size: number;
+  team_name?: string;
+  message?: string;
+};
+
 type State = {
   data: TeamDetail | null;
   loading: boolean;
   error: string | null;
   notFound: boolean;
+  gate: TeamGate | null;
 };
 
 export function useTeamDetail(teamId: number | null | undefined) {
+  const { token } = useAuth();
   const [state, setState] = useState<State>(() =>
     teamId == null
-      ? { data: null, loading: false, error: 'No team specified', notFound: false }
-      : { data: null, loading: true, error: null, notFound: false },
+      ? { data: null, loading: false, error: 'No team specified', notFound: false, gate: null }
+      : { data: null, loading: true, error: null, notFound: false, gate: null },
   );
 
   useEffect(() => {
@@ -71,19 +82,37 @@ export function useTeamDetail(teamId: number | null | undefined) {
     let cancelled = false;
 
     async function fetchTeam() {
-      setState((prev) => ({ ...prev, loading: true, error: null, notFound: false }));
+      setState((prev) => ({ ...prev, loading: true, error: null, notFound: false, gate: null }));
 
       try {
-        const data = await getJson<TeamDetail>(`/event-teams/${teamId}`);
+        const data = token
+          ? await getJsonAuth<TeamDetail>(`/event-teams/${teamId}`, token)
+          : await getJson<TeamDetail>(`/event-teams/${teamId}`);
 
         if (!cancelled) {
-          setState({ data, loading: false, error: null, notFound: false });
+          setState({ data, loading: false, error: null, notFound: false, gate: null });
         }
       } catch (err) {
         if (cancelled) return;
 
         if (err instanceof ApiError && err.status === 404) {
-          setState({ data: null, loading: false, error: null, notFound: true });
+          setState({ data: null, loading: false, error: null, notFound: true, gate: null });
+        } else if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+          const body = (err.body ?? {}) as Record<string, unknown>;
+          const gateMode =
+            err.status === 401
+              ? 'login'
+              : body?.status === 'ENROLLED'
+                ? 'blocked'
+                : 'prompt';
+          const gate: TeamGate = {
+            mode: gateMode,
+            event_slug: (body.event_slug as string) ?? '',
+            team_size: Number(body.team_size ?? 0),
+            team_name: (body.team_name as string) ?? undefined,
+            message: typeof body.error === 'string' ? body.error : undefined,
+          };
+          setState({ data: null, loading: false, error: null, notFound: false, gate });
         } else {
           console.error('Failed to load team detail', err);
           setState({
@@ -91,6 +120,7 @@ export function useTeamDetail(teamId: number | null | undefined) {
             loading: false,
             error: 'Failed to load team. Please try again.',
             notFound: false,
+            gate: null,
           });
         }
       }
@@ -101,17 +131,35 @@ export function useTeamDetail(teamId: number | null | undefined) {
     return () => {
       cancelled = true;
     };
-  }, [teamId]);
+  }, [teamId, token]);
 
   const refetch = async () => {
     if (teamId == null) return;
-    setState((prev) => ({ ...prev, loading: true, error: null, notFound: false }));
+    setState((prev) => ({ ...prev, loading: true, error: null, notFound: false, gate: null }));
     try {
-      const data = await getJson<TeamDetail>(`/event-teams/${teamId}`);
-      setState({ data, loading: false, error: null, notFound: false });
+      const data = token
+        ? await getJsonAuth<TeamDetail>(`/event-teams/${teamId}`, token)
+        : await getJson<TeamDetail>(`/event-teams/${teamId}`);
+      setState({ data, loading: false, error: null, notFound: false, gate: null });
     } catch (err) {
       if (err instanceof ApiError && err.status === 404) {
-        setState({ data: null, loading: false, error: null, notFound: true });
+        setState({ data: null, loading: false, error: null, notFound: true, gate: null });
+      } else if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+        const body = (err.body ?? {}) as Record<string, unknown>;
+        const gateMode =
+          err.status === 401
+            ? 'login'
+            : body?.status === 'ENROLLED'
+              ? 'blocked'
+              : 'prompt';
+        const gate: TeamGate = {
+          mode: gateMode,
+          event_slug: (body.event_slug as string) ?? '',
+          team_size: Number(body.team_size ?? 0),
+          team_name: (body.team_name as string) ?? undefined,
+          message: typeof body.error === 'string' ? body.error : undefined,
+        };
+        setState({ data: null, loading: false, error: null, notFound: false, gate });
       } else {
         console.error('Failed to load team detail', err);
         setState({
@@ -119,6 +167,7 @@ export function useTeamDetail(teamId: number | null | undefined) {
           loading: false,
           error: 'Failed to load team. Please try again.',
           notFound: false,
+          gate: null,
         });
       }
     }

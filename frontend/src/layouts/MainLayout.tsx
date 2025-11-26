@@ -28,7 +28,6 @@ export const MainLayout: React.FC = () => {
           >
             <Link to="/">Home</Link>
             <Link to="/events">Events</Link>
-            <Link to="/statistics">Statistics</Link>
             <Link to="/about">About</Link>
             {user && (user.role === 'ADMIN' || user.role === 'SUPERADMIN') && <Link to="/admin">Admin</Link>}
           </div>

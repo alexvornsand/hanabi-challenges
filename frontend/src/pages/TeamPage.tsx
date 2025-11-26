@@ -3,9 +3,10 @@ import { NotFoundPage } from './NotFoundPage';
 import { useTeamDetail, type TeamGame } from '../hooks/useTeamDetail';
 import { useTeamTemplates, type TeamTemplate } from '../hooks/useTeamTemplates';
 import { UserPill } from '../components/UserPill';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { postJsonAuth, ApiError } from '../lib/api';
+import { postJsonAuth } from '../lib/api';
+import { SpoilerGatePage } from './SpoilerGatePage';
 
 export function TeamPage() {
   const { slug, teamId } = useParams<{ slug: string; teamId: string }>();
@@ -15,8 +16,14 @@ export function TeamPage() {
     return Number.isInteger(n) ? n : null;
   })();
 
-  const { data, loading, error, notFound, refetch } = useTeamDetail(parsedTeamId);
-  const { templates, loading: templatesLoading, error: templatesError } = useTeamTemplates(parsedTeamId);
+  const { data, loading, error, notFound, refetch, gate } = useTeamDetail(parsedTeamId);
+  const [templatesEnabled, setTemplatesEnabled] = useState(true);
+  const { templates, loading: templatesLoading, error: templatesError } = useTeamTemplates(
+    parsedTeamId,
+    {
+      enabled: templatesEnabled,
+    },
+  );
   const { user, token } = useAuth();
   const [leaveError, setLeaveError] = useState<string | null>(null);
   const [leaving, setLeaving] = useState(false);
@@ -38,6 +45,14 @@ export function TeamPage() {
       validationRaw?: unknown;
     }
   >>({});
+  const [forfeitLoading, setForfeitLoading] = useState(false);
+  useEffect(() => {
+    if (gate) {
+      setTemplatesEnabled(false);
+    } else {
+      setTemplatesEnabled(true);
+    }
+  }, [gate]);
 
   const members = useMemo(() => data?.members ?? [], [data]);
   const isMember = useMemo(() => (user ? members.some((m) => m.user_id === user.id) : false), [user, members]);
@@ -102,6 +117,23 @@ export function TeamPage() {
     return defaults;
   }, [templateStages]);
   const [collapsedOverrides, setCollapsedOverrides] = useState<Record<string, boolean>>({});
+  const handleForfeit = async () => {
+    if (!token || !parsedTeamId) return;
+    setForfeitLoading(true);
+    try {
+      await postJsonAuth(`/events/${gate?.event_slug ?? data?.team.event_slug}/eligibility/spoilers`, token, {
+        team_size: gate?.team_size ?? data?.team.team_size,
+        source_event_team_id: parsedTeamId,
+        reason: 'team_page_spoiler',
+      });
+      setTemplatesEnabled(true);
+      await refetch();
+    } catch (err) {
+      console.error('Failed to forfeit eligibility', err);
+    } finally {
+      setForfeitLoading(false);
+    }
+  };
 
   if (!parsedTeamId || notFound) {
     return <NotFoundPage />;
@@ -121,6 +153,18 @@ export function TeamPage() {
         <h1 className="text-xl font-semibold mb-2">Team</h1>
         <p className="text-red-600">{error}</p>
       </main>
+    );
+  }
+
+  if (gate && !isMember) {
+    return (
+      <SpoilerGatePage
+        mode={gate.mode === 'prompt' ? 'prompt' : gate.mode === 'blocked' ? 'blocked' : 'login'}
+        eventSlug={gate.event_slug || slug}
+        onForfeit={gate.mode === 'prompt' ? handleForfeit : undefined}
+        loading={forfeitLoading}
+        errorMessage={gate.message}
+      />
     );
   }
 

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { ApiError, getJson } from '../lib/api';
+import { ApiError, getJson, getJsonAuth } from '../lib/api';
+import { useAuth } from '../context/AuthContext';
 
 export type TeamTemplate = {
   stage_index: number;
@@ -33,19 +34,25 @@ type State = {
   error: string | null;
 };
 
-export function useTeamTemplates(teamId: number | null | undefined) {
+export function useTeamTemplates(teamId: number | null | undefined, options?: { enabled?: boolean }) {
+  const { token } = useAuth();
   const [state, setState] = useState<State>(() =>
     teamId == null ? { templates: [], loading: false, error: 'No team specified' } : { templates: [], loading: true, error: null },
   );
 
   useEffect(() => {
-    if (teamId == null) return;
+    if (teamId == null || options?.enabled === false) {
+      setState((prev) => ({ ...prev, loading: false }));
+      return;
+    }
     let cancelled = false;
 
     async function fetchTemplates() {
       setState({ templates: [], loading: true, error: null });
       try {
-        const data = await getJson<{ templates: TeamTemplate[] }>(`/event-teams/${teamId}/templates`);
+        const data = token
+          ? await getJsonAuth<{ templates: TeamTemplate[] }>(`/event-teams/${teamId}/templates`, token)
+          : await getJson<{ templates: TeamTemplate[] }>(`/event-teams/${teamId}/templates`);
         if (!cancelled) {
           setState({ templates: data.templates, loading: false, error: null });
         }
@@ -60,7 +67,7 @@ export function useTeamTemplates(teamId: number | null | undefined) {
     return () => {
       cancelled = true;
     };
-  }, [teamId]);
+  }, [teamId, token, options?.enabled]);
 
   return state;
 }

@@ -9,6 +9,7 @@ TRUNCATE TABLE
   game_participants,
   event_games,
   event_game_templates,
+  event_player_eligibilities,
   team_memberships,
   event_teams,
   event_stages,
@@ -176,6 +177,49 @@ VALUES
   (4, 4, 'PLAYER', true),  -- donald
   (4, 5, 'PLAYER', true),  -- emily
   (4, 7, 'PLAYER', true);  -- grace
+
+
+-- ================================
+-- Event player eligibility (team-size scoped)
+-- ================================
+-- Tracks enrollment and spoiler forfeits per team size.
+-- NOTE: timestamps are generated at import time for simplicity.
+
+INSERT INTO event_player_eligibilities (
+  event_id,
+  user_id,
+  team_size,
+  status,
+  source_event_team_id,
+  status_reason,
+  changed_at
+)
+VALUES
+  -- Event 1 (Spring Circuit 2025) - 2p team (Lanterns) - enrolled
+  (1, 1, 2, 'ENROLLED', 1, 'registered', NOW()),
+  (1, 2, 2, 'ENROLLED', 1, 'registered', NOW()),
+  (1, 3, 2, 'ENROLLED', 1, 'registered', NOW()),
+  (1, 4, 2, 'ENROLLED', 1, 'registered', NOW()),
+
+  -- Event 1 (Spring Circuit 2025) - 3p team (Clue Crew) - enrolled
+  (1, 2, 3, 'ENROLLED', 2, 'registered', NOW()),
+  (1, 5, 3, 'ENROLLED', 2, 'registered', NOW()),
+  (1, 6, 3, 'ENROLLED', 2, 'registered', NOW()),
+
+  -- Event 2 (Summer Sprint 2025) - 4p team (Faded Signals) - enrolled
+  (2, 1, 4, 'ENROLLED', 3, 'registered', NOW()),
+  (2, 3, 4, 'ENROLLED', 3, 'registered', NOW()),
+  (2, 5, 4, 'ENROLLED', 3, 'registered', NOW()),
+  (2, 6, 4, 'ENROLLED', 3, 'registered', NOW()),
+  (2, 7, 4, 'ENROLLED', 3, 'registered', NOW()),
+
+  -- Event 2 (Summer Sprint 2025) - 3p team (Risky Fuses) - enrolled
+  (2, 4, 3, 'ENROLLED', 4, 'registered', NOW()),
+  (2, 5, 3, 'ENROLLED', 4, 'registered', NOW()),
+  (2, 7, 3, 'ENROLLED', 4, 'registered', NOW()),
+
+  -- Example spoiler: grace peeked at the Lanterns (event 1, 2p) despite not being on a 2p team there
+  (1, 7, 2, 'INELIGIBLE', 1, 'Viewed Lanterns team page', NOW());
 
 
 -- ================================
