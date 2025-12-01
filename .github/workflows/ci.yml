@@ -20,6 +20,10 @@ jobs:
         working-directory: backend
         run: npm install
 
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm install
+
       - name: Set environment variables for tests
         run: |
           echo "JWT_SECRET=test_jwt_secret_for_ci" >> $GITHUB_ENV
