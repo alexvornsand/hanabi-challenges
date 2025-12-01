@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
 TEST_DB_CONTAINER="hanabi_db_test"
 COMPOSE_FILE="${ROOT_DIR}/docker/test/docker-compose.yml"

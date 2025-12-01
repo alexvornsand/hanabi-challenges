@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
 DB_CONTAINER_NAME="${DB_CONTAINER_NAME:-hanabi_db_test}"
 DB_NAME="${DB_NAME:-hanabi_test}"
 DB_USER="${DB_USER:-hanabi_user}"
 DB_PASSWORD="${DB_PASSWORD:-hanabi_password}"
 
-SCHEMA_FILE="${ROOT_DIR}/db/schema.sql"
+SCHEMA_FILE="${ROOT_DIR}/backend/db/schema.sql"
 
 if [ ! -f "${SCHEMA_FILE}" ]; then
   echo "Schema file not found at ${SCHEMA_FILE}"
