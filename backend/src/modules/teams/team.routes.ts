@@ -29,11 +29,28 @@ async function checkEligibilityGate(options: {
   viewerId: number | null;
 }) {
   const { teamSize, eventId, teamName, eventSlug, viewerId } = options;
+
+  // Allow public viewing once the event is finished (no spoiler risk).
+  const eventMeta = await pool.query<{ ends_at: Date | null }>(
+    'SELECT ends_at FROM events WHERE id = $1',
+    [eventId],
+  );
+  const endedAt = eventMeta.rows[0]?.ends_at ? new Date(eventMeta.rows[0].ends_at) : null;
+  if (endedAt && endedAt.getTime() < Date.now()) {
+    return { allowed: true };
+  }
+
   if (!viewerId) {
     return {
       allowed: false,
       status: 'login' as const,
-      body: { error: 'Login required to view spoilers', team_size: teamSize, event_slug: eventSlug, team_name: teamName, status: 'LOGIN_REQUIRED' },
+      body: {
+        error: 'Login required to view spoilers',
+        team_size: teamSize,
+        event_slug: eventSlug,
+        team_name: teamName,
+        status: 'LOGIN_REQUIRED',
+      },
     };
   }
 
@@ -50,13 +67,25 @@ async function checkEligibilityGate(options: {
     return {
       allowed: false,
       status: 'blocked' as const,
-      body: { error: 'Enrolled users cannot view spoilers', team_size: teamSize, event_slug: eventSlug, team_name: teamName, status: 'ENROLLED' },
+      body: {
+        error: 'Enrolled users cannot view spoilers',
+        team_size: teamSize,
+        event_slug: eventSlug,
+        team_name: teamName,
+        status: 'ENROLLED',
+      },
     };
   }
   return {
     allowed: false,
     status: 'prompt' as const,
-    body: { error: 'Forfeit eligibility required to view spoilers', team_size: teamSize, event_slug: eventSlug, team_name: teamName, status: 'REQUIRES_FORFEIT' },
+    body: {
+      error: 'Forfeit eligibility required to view spoilers',
+      team_size: teamSize,
+      event_slug: eventSlug,
+      team_name: teamName,
+      status: 'REQUIRES_FORFEIT',
+    },
   };
 }
 
@@ -249,7 +278,8 @@ router.post('/:id/members', authRequired, async (req: AuthenticatedRequest, res:
       return;
     }
 
-    const isOwner = requester && team.owner_user_id != null && team.owner_user_id === requester.userId;
+    const isOwner =
+      requester && team.owner_user_id != null && team.owner_user_id === requester.userId;
     const isAdmin = requester && (requester.role === 'ADMIN' || requester.role === 'SUPERADMIN');
     if (!isOwner && !isAdmin) {
       res.status(403).json({ error: 'Only the team owner or an admin can add members' });
@@ -372,8 +402,7 @@ router.delete(
       }
 
       const isSelf = requester.userId === targetUserId;
-      const isOwner =
-        team.owner_user_id != null && requester.userId === team.owner_user_id;
+      const isOwner = team.owner_user_id != null && requester.userId === team.owner_user_id;
       const isAdmin = requester.role === 'ADMIN' || requester.role === 'SUPERADMIN';
       if (!isSelf && !isOwner && !isAdmin) {
         res.status(403).json({ error: 'Not authorized to remove this member' });
@@ -382,9 +411,7 @@ router.delete(
 
       const alreadyPlayed = await hasUserPlayedOnTeam(eventTeamId, targetUserId);
       if (alreadyPlayed) {
-        res
-          .status(409)
-          .json({ error: 'This member has recorded games and cannot be removed.' });
+        res.status(409).json({ error: 'This member has recorded games and cannot be removed.' });
         return;
       }
 

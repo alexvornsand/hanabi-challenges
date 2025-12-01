@@ -61,12 +61,7 @@ describe('team.service (integration)', () => {
       VALUES ($1, $2, $3, $4)
       RETURNING id;
       `,
-      [
-        'Team Test Event',
-        'team-test-event',
-        'short desc',
-        'long description for event team tests',
-      ],
+      ['Team Test Event', 'team-test-event', 'short desc', 'long description for event team tests'],
     );
     const eventId = eventRes.rows[0].id as number;
 

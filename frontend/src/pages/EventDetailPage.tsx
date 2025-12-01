@@ -5,19 +5,53 @@ import { useEventDetail } from '../hooks/useEventDetail';
 import { useEventTeams } from '../hooks/useEventTeams';
 import { useAuth } from '../context/AuthContext';
 import { useUserDirectory } from '../hooks/useUserDirectory';
-import { UserPill } from '../components/UserPill';
+import { UserPill } from '../features/users/UserPill';
+import { UserSearchSelect, type UserSuggestion } from '../features/users/UserSearchSelect';
+import { EventCard } from '../features/events';
 import { ApiError, postJsonAuth } from '../lib/api';
 import { useEventMemberships } from '../hooks/useEventMemberships';
+import {
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  Heading,
+  Inline,
+  Input,
+  InputContainer,
+  Modal,
+  PageContainer,
+  Section,
+  Stack,
+  Text,
+  Alert,
+  Tooltip,
+} from '../design-system';
 
 export function EventDetailPage() {
   const { slug, teamSize } = useParams<{ slug: string; teamSize?: string }>();
-  const navigate = useNavigate();
   const auth = useAuth();
   const { users: directory } = useUserDirectory();
   const { memberships } = useEventMemberships(slug);
   const [showRegister, setShowRegister] = useState(false);
-  const [registerMessage, setRegisterMessage] = useState<string | null>(null);
   const [registerError, setRegisterError] = useState<string | null>(null);
+  const [nowTs, setNowTs] = useState(() => Date.now());
+
+  useEffect(() => {
+    const id = window.setInterval(() => setNowTs(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  function formatCountdown(ms: number) {
+    if (Number.isNaN(ms)) return '';
+    const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+    const days = Math.floor(totalSeconds / 86400);
+    const hours = Math.floor((totalSeconds % 86400) / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    if (days > 0) return `${days}d ${hours}h`;
+    if (hours > 0) return `${hours}h ${minutes}m`;
+    return `${minutes}m`;
+  }
 
   const parsedTeamSize = (() => {
     const n = teamSize ? Number(teamSize) : 3;
@@ -68,153 +102,162 @@ export function EventDetailPage() {
   const startsAt = event.starts_at ? new Date(event.starts_at) : null;
   const endsAt = event.ends_at ? new Date(event.ends_at) : null;
   const cutoff = event.registration_cutoff ? new Date(event.registration_cutoff) : endsAt;
+  const registrationOpens = event.registration_opens_at
+    ? new Date(event.registration_opens_at)
+    : startsAt;
   const now = new Date();
   const registrationClosed = !!(cutoff && now > cutoff && !event.allow_late_registration);
+  const registrationWindow = (() => {
+    if (registrationOpens && nowTs < registrationOpens.getTime()) {
+      return {
+        label: `Opens in ${formatCountdown(registrationOpens.getTime() - nowTs)}`,
+        variant: 'default' as const,
+        canRegister: false,
+      };
+    }
+    if (cutoff && nowTs < cutoff.getTime()) {
+      return {
+        label: `Closes in ${formatCountdown(cutoff.getTime() - nowTs)}`,
+        variant: 'accent' as const,
+        canRegister: true,
+      };
+    }
+    if (registrationClosed) {
+      return { label: 'Registration closed', variant: 'default' as const, canRegister: false };
+    }
+    return { label: 'Registration open', variant: 'accent' as const, canRegister: true };
+  })();
 
   return (
-    <main className="page">
-      <header className="card" style={{ padding: 'var(--space-md)', position: 'relative' }}>
-        <div className="stack-sm" style={{ flex: '1 1 auto' }}>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold" style={{ margin: 0 }}>{event.name}</h1>
-            {event.published === false && (
-              <span className="pill text-xs" style={{ background: 'var(--color-surface-muted)' }}>
-                Unpublished
-              </span>
-            )}
-          </div>
-          {(startsAt || endsAt) && (
-            <div className="inline items-center gap-2 text-sm text-gray-700">
-              <span className="pill pill--accent">
-                {startsAt ? startsAt.toLocaleDateString() : 'TBD'} — {endsAt ? endsAt.toLocaleDateString() : 'TBD'}
-              </span>
-            </div>
-          )}
-        </div>
-        {teamsLoading ? null : totalGamesPlayed > 0 ? (
-          <div
-            style={{
-              position: 'absolute',
-              top: 'var(--space-sm)',
-              right: 'var(--space-sm)',
-              display: 'flex',
-              gap: '8px',
-            }}
-          >
-            <Link to={`/events/${event.slug}/stats`} className="btn btn--secondary">
-              View Stats
-            </Link>
-          </div>
-        ) : null}
-        {event.long_description && (
-          <div
-            className="text-gray-800"
-            style={{ whiteSpace: 'pre-line', marginTop: 'var(--space-md)' }}
-          >
-            {event.long_description}
-          </div>
-        )}
-      </header>
+    <main>
+      <PageContainer>
+        <Section paddingY="lg">
+          <Stack gap="md">
+            <EventCard
+              event={event}
+              description="long"
+              now={nowTs}
+              disableLink
+              headerAction={
+                !teamsLoading && totalGamesPlayed > 0 ? (
+                  <Button
+                    as={Link}
+                    to={`/events/${event.slug}/stats`}
+                    variant="secondary"
+                    size="md"
+                  >
+                    View stats
+                  </Button>
+                ) : undefined
+              }
+            />
 
-      <section className="card stack-sm" style={{ position: 'relative' }}>
-        <button
-          className="btn btn--primary"
-          style={{ position: 'absolute', top: 'var(--space-sm)', right: 'var(--space-sm)' }}
-          onClick={() => {
-            if (registrationClosed) return;
-            setRegisterMessage(null);
-            setRegisterError(null);
-            setShowRegister(true);
-          }}
-          disabled={registrationClosed}
-          title={registrationClosed ? 'Registration for this event is closed' : undefined}
-        >
-          Register a Team
-        </button>
-        <div className="flex flex-wrap gap-2">
-          {[2, 3, 4, 5, 6].map((size) => {
-            const isActive = parsedTeamSize === size;
-            const target = size === 3 ? `/events/${event.slug}` : `/events/${event.slug}/${size}`;
-            return (
-              <Link
-                key={size}
-                to={target}
-                className={`pill ${isActive ? 'pill--accent' : ''}`}
-              >
-                {size} Player
-              </Link>
-            );
-          })}
-        </div>
+            <Card variant="outline" separated>
+              <CardHeader>
+                <Inline align="center" justify="space-between" wrap>
+                  <Heading level={3}>Teams</Heading>
+                  <Button
+                    variant="primary"
+                    size="md"
+                    onClick={() => {
+                      if (!registrationWindow.canRegister) return;
+                      setRegisterError(null);
+                      setShowRegister(true);
+                    }}
+                    disabled={!registrationWindow.canRegister}
+                    title={
+                      !registrationWindow.canRegister
+                        ? 'Registration for this event is closed or not yet open'
+                        : undefined
+                    }
+                  >
+                    Register a Team
+                  </Button>
+                </Inline>
+              </CardHeader>
+              <CardBody>
+                <Inline gap="sm" wrap align="center" style={{ marginBottom: 'var(--ds-space-sm)' }}>
+                  {[2, 3, 4, 5, 6].map((size) => {
+                    const isActive = parsedTeamSize === size;
+                    const target =
+                      size === 3 ? `/events/${event.slug}` : `/events/${event.slug}/${size}`;
+                    return (
+                      <Link
+                        key={size}
+                        to={target}
+                        className={`pill ${isActive ? 'pill--accent' : ''}`}
+                      >
+                        {size} Player
+                      </Link>
+                    );
+                  })}
+                </Inline>
 
-        <div className="stack-sm">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold" style={{ margin: 0 }}>
-              Teams
-            </h2>
-            {teamsLoading && <p className="text-sm text-gray-600">Loading teams…</p>}
-          </div>
+                {teamsLoading && <Text variant="muted">Loading teams…</Text>}
+                {teamsError && <Text variant="body">{teamsError}</Text>}
 
-          {teamsError && <p className="text-red-600">{teamsError}</p>}
-
-          {!teamsLoading && !teamsError && (
-            <>
-              {teams.filter((t) => t.team_size === parsedTeamSize).length === 0 ? (
-                <p className="text-gray-600">No {parsedTeamSize}-player teams yet.</p>
-              ) : (
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Name</th>
-                      <th className="text-right">Games</th>
-                      <th className="text-right">Win Rate</th>
-                      <th className="text-right">Avg BDR</th>
-                      <th className="text-right">Avg Score</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {teams
-                      .filter((t) => t.team_size === parsedTeamSize)
-                      .map((team) => {
-                        const completed = team.completed_games ?? 0;
-                        const perfect = team.perfect_games ?? 0;
-                        const winRate =
-                          completed > 0 ? `${Math.round((perfect / completed) * 100)}%` : '—';
-                        const avgBdr =
-                          team.avg_bdr != null ? Number(team.avg_bdr).toFixed(2) : '—';
-                        const avgScore =
-                          team.avg_score != null ? Number(team.avg_score).toFixed(2) : '—';
-                        return (
-                          <tr key={team.id} className="border-t">
-                            <td className="text-sm">
-                              <Link
-                                to={`/events/${event.slug}/teams/${team.id}`}
-                                className="font-medium text-blue-700 hover:underline"
-                              >
-                                {team.name}
-                              </Link>
-                            </td>
-                            <td className="text-sm text-right text-gray-600">
-                              {completed} / {team.total_templates ?? '—'}
-                            </td>
-                            <td className="text-sm text-right text-gray-600">{winRate}</td>
-                            <td className="text-sm text-right text-gray-600">{avgBdr}</td>
-                            <td className="text-sm text-right text-gray-600">{avgScore}</td>
+                {!teamsLoading && !teamsError && (
+                  <>
+                    {teams.filter((t) => t.team_size === parsedTeamSize).length === 0 ? (
+                      <Text variant="muted">No {parsedTeamSize}-player teams yet.</Text>
+                    ) : (
+                      <table>
+                        <thead>
+                          <tr>
+                            <th>Name</th>
+                            <th className="text-right">Games</th>
+                            <th className="text-right">Win Rate</th>
+                            <th className="text-right">Avg BDR</th>
+                            <th className="text-right">Avg Score</th>
                           </tr>
-                        );
-                      })}
-                  </tbody>
-                </table>
-              )}
-            </>
-          )}
-        </div>
-      </section>
+                        </thead>
+                        <tbody>
+                          {teams
+                            .filter((t) => t.team_size === parsedTeamSize)
+                            .map((team) => {
+                              const completed = team.completed_games ?? 0;
+                              const perfect = team.perfect_games ?? 0;
+                              const winRate =
+                                completed > 0 ? `${Math.round((perfect / completed) * 100)}%` : '—';
+                              const avgBdr =
+                                team.avg_bdr != null ? Number(team.avg_bdr).toFixed(2) : '—';
+                              const avgScore =
+                                team.avg_score != null ? Number(team.avg_score).toFixed(2) : '—';
+                              return (
+                                <tr key={team.id} className="border-t">
+                                  <td className="text-sm">
+                                    <Link
+                                      to={`/events/${event.slug}/teams/${team.id}`}
+                                      className="font-medium text-blue-700 hover:underline"
+                                    >
+                                      {team.name}
+                                    </Link>
+                                  </td>
+                                  <td className="text-sm text-right text-gray-600">
+                                    {completed} / {team.total_templates ?? '—'}
+                                  </td>
+                                  <td className="text-sm text-right text-gray-600">{winRate}</td>
+                                  <td className="text-sm text-right text-gray-600">{avgBdr}</td>
+                                  <td className="text-sm text-right text-gray-600">{avgScore}</td>
+                                </tr>
+                              );
+                            })}
+                        </tbody>
+                      </table>
+                    )}
+                  </>
+                )}
+              </CardBody>
+            </Card>
+          </Stack>
+        </Section>
+      </PageContainer>
 
       {showRegister && (
         <RegisterModal
           eventSlug={event.slug}
           eventName={event.name}
+          enforceExactTeamSize={Boolean(event.enforce_exact_team_size)}
           refetchTeams={refetchTeams}
           auth={auth}
           directory={directory}
@@ -223,13 +266,11 @@ export function EventDetailPage() {
             setShowRegister(false);
             setRegisterError(null);
           }}
-          onSuccess={(msg) => {
+          onSuccess={() => {
             setRegisterError(null);
-            setRegisterMessage(msg);
           }}
           onError={(msg) => {
             setRegisterError(msg);
-            setRegisterMessage(null);
           }}
         />
       )}
@@ -263,6 +304,7 @@ type RegisterModalProps = {
   onClose: () => void;
   onSuccess: (msg: string) => void;
   onError: (msg: string | null) => void;
+  enforceExactTeamSize?: boolean;
 };
 
 function RegisterModal({
@@ -275,6 +317,7 @@ function RegisterModal({
   onClose,
   onSuccess,
   onError,
+  enforceExactTeamSize = false,
 }: RegisterModalProps) {
   const navigate = useNavigate();
   useEffect(() => {
@@ -288,7 +331,8 @@ function RegisterModal({
   const user = auth.user;
   const defaultTeamName = user ? `${user.display_name}'s Team` : 'My Team';
   const [teamName, setTeamName] = useState('');
-  const [teamSize, setTeamSize] = useState(3);
+  const [teamPassword, setTeamPassword] = useState('');
+  const [teamSize, setTeamSize] = useState<number | null>(null);
   const [memberInput, setMemberInput] = useState('');
   const [saving, setSaving] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
@@ -316,7 +360,8 @@ function RegisterModal({
     return map;
   }, [memberships]);
 
-  const markIneligibility = (list: MemberEntry[], size: number) => {
+  const markIneligibility = (list: MemberEntry[], size: number | null) => {
+    if (!size) return list.map((m) => ({ ...m, ineligible: false }));
     const blocked = conflictsBySize.get(size) ?? new Set<number>();
     return list.map((m) =>
       m.id && blocked.has(m.id) ? { ...m, ineligible: true } : { ...m, ineligible: false },
@@ -326,9 +371,10 @@ function RegisterModal({
   const suggestions = useMemo(() => {
     const term = memberInput.trim().toLowerCase();
     if (!term) return [];
+    const blocked = teamSize ? conflictsBySize.get(teamSize) : undefined;
     return directory
       .filter((u) => !members.some((m) => m.id === u.id))
-      .filter((u) => !(conflictsBySize.get(teamSize)?.has(u.id)))
+      .filter((u) => !blocked?.has(u.id))
       .filter((u) => u.display_name.toLowerCase().includes(term))
       .slice(0, 5);
   }, [memberInput, directory, members, conflictsBySize, teamSize]);
@@ -342,85 +388,39 @@ function RegisterModal({
     } else if (localError && localError.includes('already on a')) {
       setLocalError(null);
     }
-  }, [members, teamSize]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [members, teamSize, localError]);
 
   if (!user) {
     return (
-      <div
-        style={{
-          position: 'fixed',
-          inset: 0,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '16px',
-          zIndex: 2000,
-          background: 'rgba(0,0,0,0.25)',
-          backdropFilter: 'blur(2px)',
-        }}
-        onClick={(e) => {
-          if (e.target === e.currentTarget) onClose();
-        }}
-      >
-        <div
-          className="card"
-          style={{
-            padding: 'var(--space-md)',
-            maxWidth: '480px',
-            width: '100%',
-            boxShadow: '0 10px 30px rgba(0,0,0,0.15)',
-          }}
-        >
-          <div className="space-y-3" style={{ position: 'relative' }}>
-            <button
-              onClick={onClose}
-              aria-label="Close"
-              style={{
-                position: 'absolute',
-                top: '6px',
-                right: '6px',
-                border: 'none',
-                background: 'transparent',
-                cursor: 'pointer',
-                fontSize: '16px',
-                lineHeight: 1,
-              }}
-            >
-              ×
-            </button>
-            <h2 className="text-xl font-semibold" style={{ margin: 0, marginBottom: '0.5rem' }}>
-              Log in to register
-            </h2>
-            <p className="text-gray-700" style={{ margin: 0, marginBottom: '0.9rem' }}>
-              You need to log in before registering a team.
-            </p>
-            <div className="flex gap-2 justify-start">
-              <Link
-                to="/login"
-                className="btn btn--primary"
-                style={{ padding: '10px 14px', textDecoration: 'none' }}
-              >
-                Go to login
-              </Link>
-            </div>
-          </div>
-        </div>
-      </div>
+      <Modal open onClose={onClose} maxWidth="520px">
+        <Stack gap="sm">
+          <Heading level={3}>Log in to register</Heading>
+          <Text variant="body">You need to log in before registering a team.</Text>
+          <Inline gap="sm" align="center">
+            <Button as={Link} to="/login" variant="primary" size="sm">
+              Go to login
+            </Button>
+            <Button variant="ghost" size="sm" onClick={onClose}>
+              Cancel
+            </Button>
+          </Inline>
+        </Stack>
+      </Modal>
     );
   }
 
   const addMember = (entry: MemberEntry) => {
     setMembers((prev) => markIneligibility([...prev, entry], teamSize));
-    setMemberInput('');
     setLocalError(null);
   };
 
-  const handleAddMemberInput = () => {
-    const name = memberInput.trim();
+  const handleAddMemberInput = (inputVal?: string) => {
+    const name = (inputVal ?? memberInput).trim();
     if (!name) return;
     const existing = directory.find((u) => u.display_name.toLowerCase() === name.toLowerCase());
     if (existing && !members.some((m) => m.id === existing.id)) {
-      if (conflictsBySize.get(teamSize)?.has(existing.id)) {
+      const conflictSet = teamSize ? conflictsBySize.get(teamSize) : undefined;
+      if (conflictSet?.has(existing.id)) {
         const msg = `${existing.display_name} is already on a ${teamSize}p team for this event.`;
         setLocalError(msg);
         onError(msg);
@@ -443,6 +443,7 @@ function RegisterModal({
       role: 'PLAYER',
       isPending: true,
     });
+    setMemberInput('');
   };
 
   const removeMember = (name: string) => {
@@ -456,6 +457,24 @@ function RegisterModal({
 
   const handleSubmit = async () => {
     const finalName = teamName.trim() || defaultTeamName;
+    if (!teamSize) {
+      const msg = 'Select a team size.';
+      setLocalError(msg);
+      onError(msg);
+      return;
+    }
+    if (enforceExactTeamSize && teamSize && members.length !== teamSize) {
+      const msg = `Team must have exactly ${teamSize} players.`;
+      setLocalError(msg);
+      onError(msg);
+      return;
+    }
+    if (teamPassword && /[^a-zA-Z0-9]/.test(teamPassword)) {
+      const msg = 'Team password must be alphanumeric only.';
+      setLocalError(msg);
+      onError(msg);
+      return;
+    }
     if (members.length === 0) {
       const msg = 'Add at least one member.';
       setLocalError(msg);
@@ -481,6 +500,7 @@ function RegisterModal({
     try {
       const payload = {
         team_name: finalName,
+        team_password: teamPassword || undefined,
         team_size: teamSize,
         members: members.map((m) =>
           m.id
@@ -498,15 +518,12 @@ function RegisterModal({
         console.error('Failed to refresh teams after register', fetchErr);
       }
       const target =
-        teamSize === 3
-          ? `/events/${eventSlug}`
-          : `/events/${eventSlug}/${teamSize}`;
+        teamSize && teamSize !== 3 ? `/events/${eventSlug}/${teamSize}` : `/events/${eventSlug}`;
       navigate(target, { replace: true });
       onClose();
     } catch (err) {
       if (err instanceof ApiError) {
-        const msg =
-          (err.body as { error?: string })?.error ?? 'Failed to register team.';
+        const msg = (err.body as { error?: string })?.error ?? 'Failed to register team.';
         setLocalError(msg);
         onError(msg);
       } else {
@@ -538,7 +555,12 @@ function RegisterModal({
     >
       <div
         className="card stack-sm"
-        style={{ maxWidth: '720px', width: '100%', padding: '16px', boxShadow: 'var(--shadow-hover)' }}
+        style={{
+          maxWidth: '720px',
+          width: '100%',
+          padding: '16px',
+          boxShadow: 'var(--shadow-hover)',
+        }}
       >
         <div style={{ position: 'relative' }}>
           <div className="stack-xxs">
@@ -568,192 +590,137 @@ function RegisterModal({
           </button>
         </div>
 
-        <div className="grid gap-3 md:grid-cols-2">
-          <div className="stack-xxs">
-            <label className="text-sm font-medium text-gray-700">Team name</label>
-            <input
-              className="input"
+        <Stack gap="md">
+          <InputContainer label="Team name">
+            <Input
               value={teamName}
               onChange={(e) => setTeamName(e.target.value)}
               placeholder={defaultTeamName}
+              fullWidth
             />
-          </div>
-          <div className="stack-xxs">
-            <label className="text-sm font-medium text-gray-700">Team size</label>
-            <select
-              className="select"
-              value={teamSize}
-              onChange={(e) => {
-                const next = Number(e.target.value);
-                setTeamSize(next);
-                setMembers((prev) => markIneligibility(prev, next));
-              }}
-            >
-              {[2, 3, 4, 5, 6].map((n) => (
-                <option key={n} value={n}>
-                  {n} players
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
+          </InputContainer>
 
-        <div className="stack-xxs">
-          <label className="text-sm font-medium text-gray-700">Members</label>
+          <Inline columnWidths={[3, 7]} align="start" gap="sm">
+            <InputContainer label="Team size">
+              <select
+                className="select"
+                value={teamSize ?? ''}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  const next = val ? Number(val) : null;
+                  setTeamSize(next);
+                  setMembers((prev) => markIneligibility(prev, next));
+                }}
+                style={{ height: 'var(--ds-size-control-md-height)', width: '100%' }}
+              >
+                <option value="" disabled>
+                  Select team size
+                </option>
+                {[2, 3, 4, 5, 6].map((n) => (
+                  <option key={n} value={n}>
+                    {n} players
+                  </option>
+                ))}
+              </select>
+            </InputContainer>
+            <InputContainer
+              label="Team password (optional)"
+              labelAction={
+                <Tooltip content="This password is only used to gate access to your table. This is a feature of convenience. While your password won't be visible to anyone but you and your teammates, it is not securely stored. Do not use sensitive passwords. Passwords should be letters and numbers only.">
+                  <span
+                    className="material-symbols-outlined"
+                    style={{ fontSize: '18px', color: 'var(--ds-color-text-muted)' }}
+                    aria-label="Team password info"
+                  >
+                    info
+                  </span>
+                </Tooltip>
+              }
+            >
+              <Input
+                type="text"
+                value={teamPassword}
+                onChange={(e) => setTeamPassword(e.target.value)}
+                placeholder="Set a password for your team"
+                fullWidth
+              />
+            </InputContainer>
+          </Inline>
+
+          <InputContainer label="Members">
+            <UserSearchSelect
+              value={memberInput}
+              onChange={(next) => setMemberInput(next)}
+              suggestions={suggestions as UserSuggestion[]}
+              onSelect={(s) => {
+                addMember({
+                  id: s.id,
+                  display_name: s.display_name,
+                  color_hex: s.color_hex || '#777777',
+                  text_color: s.text_color || '#ffffff',
+                  role: 'PLAYER',
+                });
+                setMemberInput('');
+              }}
+              onSubmitFreeText={() => handleAddMemberInput()}
+              placeholder="Add member by name"
+              maxSelections={enforceExactTeamSize ? (teamSize ?? undefined) : undefined}
+              selectedCount={members.length}
+              disabled={!teamSize}
+              tokens={members.map((m) => {
+                const bg = m.ineligible ? '#dc2626' : m.color_hex || '#777777';
+                const fg = m.ineligible ? '#ffffff' : m.text_color || '#ffffff';
+                const locked = m.locked;
+                return (
+                  <button
+                    type="button"
+                    key={`${m.display_name}-${m.id ?? 'pending'}`}
+                    className={`ds-search-select__token ds-search-select__token-button${locked ? ' is-locked' : ''}`}
+                    onClick={() => {
+                      if (!locked) removeMember(m.display_name);
+                    }}
+                    title={
+                      locked
+                        ? 'You are automatically included and cannot be removed'
+                        : 'Click to remove'
+                    }
+                    style={{ background: bg, color: fg, borderRadius: '999px', borderColor: bg }}
+                  >
+                    <UserPill
+                      name={m.display_name}
+                      size="sm"
+                      color={bg}
+                      textColor={fg}
+                      hoverIcon={
+                        !locked ? (
+                          <span className="material-symbols-outlined" aria-hidden="true">
+                            &#xe5c9;
+                          </span>
+                        ) : undefined
+                      }
+                      className={`${m.isPending || !m.id ? 'user-pill--pending' : ''} user-pill--inline`}
+                    />
+                  </button>
+                );
+              })}
+            />
+          </InputContainer>
+
+          {localError && <Alert variant="error" message={localError} />}
+
           <div
             style={{
-              position: 'relative',
-              border: '1px solid var(--color-border)',
-              borderRadius: 'var(--radius-sm)',
-              background: '#fff',
-              padding: '8px',
-              minHeight: '52px',
+              display: 'flex',
+              justifyContent: 'flex-end',
+              width: '100%',
             }}
           >
-            <div className="flex flex-wrap gap-2 items-center">
-              {members.map((m) => (
-                <MemberChip
-                  key={`${m.display_name}-${m.id ?? 'pending'}`}
-                  member={m}
-                  onRemove={() => removeMember(m.display_name)}
-                />
-              ))}
-              <input
-                className="flex-1 min-w-[140px] border-0 outline-none px-1 py-1"
-                placeholder="Add member by name"
-                value={memberInput}
-                onChange={(e) => setMemberInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ',') {
-                    e.preventDefault();
-                    handleAddMemberInput();
-                  }
-                  if (e.key === 'Tab') {
-                    if (suggestions.length > 0) {
-                      e.preventDefault();
-                      addMember({
-                        id: suggestions[0].id,
-                        display_name: suggestions[0].display_name,
-                        color_hex: suggestions[0].color_hex,
-                        text_color: suggestions[0].text_color,
-                        role: 'PLAYER',
-                      });
-                      setMemberInput('');
-                    } else {
-                      handleAddMemberInput();
-                    }
-                  }
-                }}
-              />
-            </div>
-
-            {suggestions.length > 0 && (
-              <div
-                className="card"
-                style={{
-                  position: 'absolute',
-                  left: '8px',
-                  right: '8px',
-                  top: 'calc(100% + 6px)',
-                  zIndex: 10,
-                  padding: '6px',
-                  boxShadow: 'var(--shadow-card)',
-                }}
-              >
-                <p className="text-xs text-gray-500" style={{ margin: '0 0 4px 0' }}>
-                  Suggestions
-                </p>
-                <div className="flex flex-wrap gap-1">
-                  {suggestions.map((s) => (
-                    <button
-                      key={s.id}
-                      className="border rounded px-2 py-1 text-sm bg-white hover:bg-blue-50"
-                      onClick={() => {
-                        addMember({
-                          id: s.id,
-                          display_name: s.display_name,
-                          color_hex: s.color_hex,
-                          text_color: s.text_color,
-                          role: 'PLAYER',
-                        });
-                        setMemberInput('');
-                      }}
-                    >
-                      {s.display_name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
+            <button className="btn btn--primary" onClick={handleSubmit} disabled={saving}>
+              {saving ? 'Registering...' : 'Submit'}
+            </button>
           </div>
-        </div>
-
-        {localError && (
-          <div
-            className="flex items-center text-sm"
-            style={{ color: 'var(--color-danger)', gap: '6px' }}
-          >
-            <span className="material-symbols-outlined" aria-hidden="true" style={{ color: 'inherit' }}>
-              error
-            </span>
-            <span style={{ color: 'inherit' }}>{localError}</span>
-          </div>
-        )}
-
-        <div
-          style={{
-            marginTop: 'var(--space-sm)',
-            display: 'flex',
-            justifyContent: 'flex-end',
-            width: '100%',
-          }}
-        >
-          <button className="btn btn--primary" onClick={handleSubmit} disabled={saving}>
-            {saving ? 'Registering...' : 'Submit'}
-          </button>
-        </div>
+        </Stack>
       </div>
-    </div>
-  );
-}
-
-function MemberChip({
-  member,
-  onRemove,
-}: {
-  member: MemberEntry;
-  onRemove: () => void;
-}) {
-  const bg = member.color_hex || '#777777';
-  const fg = member.text_color || '#ffffff';
-  const pillBg = member.ineligible ? '#dc2626' : member.isPending ? '#777777' : bg;
-  const pillFg = member.ineligible ? '#ffffff' : member.isPending ? '#ffffff' : fg;
-  const locked = member.locked;
-  return (
-    <div
-      className="flex items-center gap-1 border rounded-full pl-2 pr-1 py-1 bg-white shadow-sm"
-      style={{
-        display: 'inline-flex',
-        cursor: locked ? 'not-allowed' : 'pointer',
-        marginRight: '6px',
-        marginBottom: '4px',
-        fontStyle: member.isPending || !member.id ? 'italic' : undefined,
-      }}
-      title={
-        locked
-          ? 'You are automatically included and cannot be removed'
-          : 'Click to remove'
-      }
-      onClick={() => {
-        if (!locked) onRemove();
-      }}
-    >
-      <UserPill
-        name={member.display_name}
-        color={pillBg}
-        textColor={pillFg}
-        className={member.isPending || !member.id ? 'user-pill--pending' : ''}
-      />
     </div>
   );
 }

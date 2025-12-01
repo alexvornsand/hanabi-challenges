@@ -96,6 +96,14 @@ export async function loginOrCreateUser(
   };
 
   const isMatch = await bcrypt.compare(password, userRow.password_hash);
+  if (process.env.LOGIN_DEBUG === '1') {
+    console.log('[login:debug]', {
+      user: userRow.display_name,
+      providedLength: password.length,
+      hashPrefix: userRow.password_hash.slice(0, 10),
+      isMatch,
+    });
+  }
   if (!isMatch) {
     throw new InvalidCredentialsError('Invalid credentials');
   }
@@ -147,7 +155,9 @@ export function pickTextColor(hex: string): '#000000' | '#ffffff' {
   const g = parseInt(full.slice(2, 4), 16) / 255;
   const b = parseInt(full.slice(4, 6), 16) / 255;
 
-  const [R, G, B] = [r, g, b].map((c) => (c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4)));
+  const [R, G, B] = [r, g, b].map((c) =>
+    c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4),
+  );
   const luminance = 0.2126 * R + 0.7152 * G + 0.0722 * B;
 
   return luminance > 0.179 ? '#000000' : '#ffffff';

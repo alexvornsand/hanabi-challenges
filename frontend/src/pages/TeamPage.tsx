@@ -2,11 +2,22 @@ import { Link, useParams } from 'react-router-dom';
 import { NotFoundPage } from './NotFoundPage';
 import { useTeamDetail, type TeamGame } from '../hooks/useTeamDetail';
 import { useTeamTemplates, type TeamTemplate } from '../hooks/useTeamTemplates';
-import { UserPill } from '../components/UserPill';
+import { UserPill } from '../features/users/UserPill';
 import { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { postJsonAuth } from '../lib/api';
 import { SpoilerGatePage } from './SpoilerGatePage';
+import { useEventDetail } from '../hooks/useEventDetail';
+
+function formatCountdown(ms: number) {
+  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  if (days > 0) return `${days}d ${hours}h`;
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  return `${minutes}m`;
+}
 
 export function TeamPage() {
   const { slug, teamId } = useParams<{ slug: string; teamId: string }>();
@@ -17,35 +28,44 @@ export function TeamPage() {
   })();
 
   const { data, loading, error, notFound, refetch, gate } = useTeamDetail(parsedTeamId);
+  const { event: eventMeta } = useEventDetail(slug);
   const [templatesEnabled, setTemplatesEnabled] = useState(true);
-  const { templates, loading: templatesLoading, error: templatesError } = useTeamTemplates(
-    parsedTeamId,
-    {
-      enabled: templatesEnabled,
-    },
-  );
+  const {
+    templates,
+    loading: templatesLoading,
+    error: templatesError,
+  } = useTeamTemplates(parsedTeamId, {
+    enabled: templatesEnabled,
+  });
   const { user, token } = useAuth();
   const [leaveError, setLeaveError] = useState<string | null>(null);
   const [leaving, setLeaving] = useState(false);
-  const [drafts, setDrafts] = useState<Record<
-    number,
-    {
-      replay: string;
-      bdr: string;
-      notes: string;
-      replayError?: string | null;
-      replayGameId?: string | null;
-      validateStatus?: 'idle' | 'loading' | 'ok' | 'error';
-      validateMessage?: string | null;
-      derivedScore?: number | null;
-      derivedEndCondition?: string | null;
-      derivedEndConditionCode?: number | null;
-      derivedPlayers?: string[];
-      derivedPlayedAt?: string | null;
-      validationRaw?: unknown;
-    }
-  >>({});
+  const [drafts, setDrafts] = useState<
+    Record<
+      number,
+      {
+        replay: string;
+        bdr: string;
+        notes: string;
+        replayError?: string | null;
+        replayGameId?: string | null;
+        validateStatus?: 'idle' | 'loading' | 'ok' | 'error';
+        validateMessage?: string | null;
+        derivedScore?: number | null;
+        derivedEndCondition?: string | null;
+        derivedEndConditionCode?: number | null;
+        derivedPlayers?: string[];
+        derivedPlayedAt?: string | null;
+        validationRaw?: unknown;
+      }
+    >
+  >({});
   const [forfeitLoading, setForfeitLoading] = useState(false);
+  const [nowTs, setNowTs] = useState(() => Date.now());
+  useEffect(() => {
+    const id = window.setInterval(() => setNowTs(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, []);
   useEffect(() => {
     if (gate) {
       setTemplatesEnabled(false);
@@ -55,7 +75,10 @@ export function TeamPage() {
   }, [gate]);
 
   const members = useMemo(() => data?.members ?? [], [data]);
-  const isMember = useMemo(() => (user ? members.some((m) => m.user_id === user.id) : false), [user, members]);
+  const isMember = useMemo(
+    () => (user ? members.some((m) => m.user_id === user.id) : false),
+    [user, members],
+  );
   const hasPlayed = useMemo(() => {
     if (!user || !data?.games) return false;
     return data.games.some((g) =>
@@ -121,11 +144,15 @@ export function TeamPage() {
     if (!token || !parsedTeamId) return;
     setForfeitLoading(true);
     try {
-      await postJsonAuth(`/events/${gate?.event_slug ?? data?.team.event_slug}/eligibility/spoilers`, token, {
-        team_size: gate?.team_size ?? data?.team.team_size,
-        source_event_team_id: parsedTeamId,
-        reason: 'team_page_spoiler',
-      });
+      await postJsonAuth(
+        `/events/${gate?.event_slug ?? data?.team.event_slug}/eligibility/spoilers`,
+        token,
+        {
+          team_size: gate?.team_size ?? data?.team.team_size,
+          source_event_team_id: parsedTeamId,
+          reason: 'team_page_spoiler',
+        },
+      );
       setTemplatesEnabled(true);
       await refetch();
     } catch (err) {
@@ -134,6 +161,28 @@ export function TeamPage() {
       setForfeitLoading(false);
     }
   };
+
+  const playStartsAt = eventMeta?.starts_at ? new Date(eventMeta.starts_at).getTime() : null;
+  const playEndsAt = eventMeta?.ends_at ? new Date(eventMeta.ends_at).getTime() : null;
+  const playWindow = useMemo(() => {
+    if (!playStartsAt && !playEndsAt) return null;
+    if (playStartsAt && nowTs < playStartsAt) {
+      return {
+        state: 'not_started' as const,
+        label: `Play starts in ${formatCountdown(playStartsAt - nowTs)}`,
+      };
+    }
+    if (playEndsAt && nowTs < playEndsAt) {
+      return {
+        state: 'open' as const,
+        label: `Play ends in ${formatCountdown(playEndsAt - nowTs)}`,
+      };
+    }
+    if (playEndsAt && nowTs >= playEndsAt) {
+      return { state: 'closed' as const, label: 'Play closed' };
+    }
+    return { state: 'open' as const, label: 'Play open' };
+  }, [playStartsAt, playEndsAt, nowTs]);
 
   if (!parsedTeamId || notFound) {
     return <NotFoundPage />;
@@ -188,9 +237,7 @@ export function TeamPage() {
         </p>
         <div className="flex items-center gap-3 flex-wrap">
           <h1 className="text-2xl font-bold">{data.team.name}</h1>
-          <span className="pill pill--accent text-sm">
-            {data.team.team_size}-Player Team
-          </span>
+          <span className="pill pill--accent text-sm">{data.team.team_size}-Player Team</span>
         </div>
       </header>
       {leaveError && <p className="text-red-600 text-sm">{leaveError}</p>}
@@ -232,7 +279,9 @@ export function TeamPage() {
           >
             <div className="card stack-sm kpi-card">
               <span className="kpi-label">Games Completed</span>
-              <div className="kpi-value">{stats.completed} / {stats.totalTemplates}</div>
+              <div className="kpi-value">
+                {stats.completed} / {stats.totalTemplates}
+              </div>
             </div>
             <div className="card stack-sm kpi-card">
               <span className="kpi-label">Win Rate</span>
@@ -242,25 +291,49 @@ export function TeamPage() {
             </div>
             <div className="card stack-sm kpi-card">
               <span className="kpi-label">Avg BDR</span>
-              <div className="kpi-value">{stats.avgBdr != null ? stats.avgBdr.toFixed(2) : '—'}</div>
+              <div className="kpi-value">
+                {stats.avgBdr != null ? stats.avgBdr.toFixed(2) : '—'}
+              </div>
             </div>
             <div className="card stack-sm kpi-card">
               <span className="kpi-label">Avg Score</span>
-              <div className="kpi-value">{stats.avgScore != null ? stats.avgScore.toFixed(2) : '—'}</div>
+              <div className="kpi-value">
+                {stats.avgScore != null ? stats.avgScore.toFixed(2) : '—'}
+              </div>
             </div>
-            <div className="card" style={{ gridColumn: 3, gridRow: '1 / span 2', minHeight: '180px' }} />
+            <div
+              className="card"
+              style={{ gridColumn: 3, gridRow: '1 / span 2', minHeight: '180px' }}
+            />
           </div>
         </div>
       </section>
 
       <section className="stack-sm">
         <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold">Games</h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-xl font-semibold">Games</h2>
+            {playWindow && (
+              <span className={`pill text-xs ${playWindow.state === 'open' ? 'pill--accent' : ''}`}>
+                {playWindow.label}
+              </span>
+            )}
+          </div>
           {templatesLoading && <p className="text-sm text-gray-600">Loading games…</p>}
         </div>
         {templatesError && <p className="text-red-600">{templatesError}</p>}
-        {!templatesLoading && templates.length === 0 && <p className="text-gray-600">No games found.</p>}
-        {!templatesLoading && templates.length > 0 && (
+        {!templatesLoading && templates.length === 0 && (
+          <p className="text-gray-600">No games found.</p>
+        )}
+        {playWindow?.state === 'not_started' && (
+          <div className="card" style={{ padding: 'var(--space-md)' }}>
+            <p className="text-gray-700" style={{ margin: 0 }}>
+              Play hasn&apos;t started yet. Come back when the window opens to see seeds and submit
+              replays.
+            </p>
+          </div>
+        )}
+        {!templatesLoading && templates.length > 0 && playWindow?.state !== 'not_started' && (
           <div className="stack">
             {templateStages.map((stage) => (
               <div key={stage.stage_label} className="card" style={{ padding: 0 }}>
@@ -308,13 +381,20 @@ export function TeamPage() {
                           {stage.stage_label}
                         </h3>
                       </div>
-                      <div style={{ flexShrink: 0, whiteSpace: 'nowrap' }} className="text-sm text-gray-600">
+                      <div
+                        style={{ flexShrink: 0, whiteSpace: 'nowrap' }}
+                        className="text-sm text-gray-600"
+                      >
                         {perfect} / {played}
                       </div>
                     </button>
                   );
                 })()}
-                {! (collapsedOverrides[stage.stage_label] ?? collapsedMap[stage.stage_label] ?? false) && (
+                {!(
+                  collapsedOverrides[stage.stage_label] ??
+                  collapsedMap[stage.stage_label] ??
+                  false
+                ) && (
                   <table>
                     <thead>
                       <tr>
@@ -382,7 +462,9 @@ export function TeamPage() {
       </section>
 
       {isMember && !hasPlayed && (
-        <div style={{ marginTop: 'var(--space-md)', display: 'flex', justifyContent: 'flex-start' }}>
+        <div
+          style={{ marginTop: 'var(--space-md)', display: 'flex', justifyContent: 'flex-start' }}
+        >
           <button
             className="btn"
             style={{ backgroundColor: '#dc2626', color: '#fff' }}
@@ -406,7 +488,10 @@ export function TeamPage() {
                   });
                   if (!res.ok) {
                     const body = await res.json().catch(() => ({}));
-                    setLeaveError(body.error || (canDeleteTeam ? 'Failed to delete team' : 'Failed to leave team'));
+                    setLeaveError(
+                      body.error ||
+                        (canDeleteTeam ? 'Failed to delete team' : 'Failed to leave team'),
+                    );
                   } else {
                     await refetch();
                     window.location.href = `/events/${data.team.event_slug}`;
@@ -421,7 +506,13 @@ export function TeamPage() {
             }}
             disabled={leaving}
           >
-            {leaving ? (canDeleteTeam ? 'Deleting…' : 'Leaving…') : canDeleteTeam ? 'Delete team' : 'Leave team'}
+            {leaving
+              ? canDeleteTeam
+                ? 'Deleting…'
+                : 'Leaving…'
+              : canDeleteTeam
+                ? 'Delete team'
+                : 'Leave team'}
           </button>
         </div>
       )}
@@ -504,7 +595,15 @@ function mapEndCondition(code: number | null): string | null {
   }
 }
 
-function StatusIcon({ draft }: { draft: { validateStatus?: 'idle' | 'loading' | 'ok' | 'error'; validateMessage?: string | null; replayError?: string | null } }) {
+function StatusIcon({
+  draft,
+}: {
+  draft: {
+    validateStatus?: 'idle' | 'loading' | 'ok' | 'error';
+    validateMessage?: string | null;
+    replayError?: string | null;
+  };
+}) {
   if (draft.replayError) {
     return (
       <span className="material-symbols-outlined" aria-label="error" title={draft.replayError}>
@@ -521,14 +620,22 @@ function StatusIcon({ draft }: { draft: { validateStatus?: 'idle' | 'loading' | 
   }
   if (draft.validateStatus === 'ok') {
     return (
-      <span className="material-symbols-outlined" aria-label="ok" title={draft.validateMessage ?? 'Valid replay'}>
+      <span
+        className="material-symbols-outlined"
+        aria-label="ok"
+        title={draft.validateMessage ?? 'Valid replay'}
+      >
         &#xe86c;
       </span>
     );
   }
   if (draft.validateStatus === 'error') {
     return (
-      <span className="material-symbols-outlined" aria-label="error" title={draft.validateMessage ?? 'Validation failed'}>
+      <span
+        className="material-symbols-outlined"
+        aria-label="error"
+        title={draft.validateMessage ?? 'Validation failed'}
+      >
         &#xe000;
       </span>
     );
@@ -587,7 +694,13 @@ function groupTemplatesByStage(templates: TeamTemplate[]) {
   });
 }
 
-function PlayedRow({ template, fallbackGame }: { template: TeamTemplate; fallbackGame?: TeamGame }) {
+function PlayedRow({
+  template,
+  fallbackGame,
+}: {
+  template: TeamTemplate;
+  fallbackGame?: TeamGame;
+}) {
   const r = template.result!;
   const playedAtIso = r.played_at ?? fallbackGame?.played_at ?? null;
   const playedAt = playedAtIso ? new Date(playedAtIso) : null;
@@ -607,17 +720,22 @@ function PlayedRow({ template, fallbackGame }: { template: TeamTemplate; fallbac
       <td className="px-3 py-2 text-sm text-right">{score}</td>
       <td className="px-3 py-2 text-sm">{reason || 'Normal'}</td>
       <td className="px-3 py-2 text-sm text-right">{r.bottom_deck_risk ?? ''}</td>
-                      <td className="px-3 py-2 text-sm">
-                        {players.length > 0 ? (
-                          <div className="pill-row">
-                            {players.map((p) => (
-                              <UserPill key={p.display_name} name={p.display_name} color={p.color_hex} textColor={p.text_color} />
-                            ))}
-                          </div>
-                        ) : (
-                          <span className="text-gray-500">—</span>
-                        )}
-                      </td>
+      <td className="px-3 py-2 text-sm">
+        {players.length > 0 ? (
+          <div className="pill-row">
+            {players.map((p) => (
+              <UserPill
+                key={p.display_name}
+                name={p.display_name}
+                color={p.color_hex}
+                textColor={p.text_color}
+              />
+            ))}
+          </div>
+        ) : (
+          <span className="text-gray-500">—</span>
+        )}
+      </td>
       <td className="px-3 py-2 text-sm">{playedAt ? playedAt.toLocaleDateString() : ''}</td>
       <td className="px-3 py-2 text-sm">
         {r.hanab_game_id ? (
@@ -822,10 +940,12 @@ function UnplayedRow({
       const bodyError =
         err instanceof ApiError ? (err.body as { error?: string; details?: string })?.error : null;
       const bodyDetails =
-        err instanceof ApiError ? (err.body as { error?: string; details?: string })?.details : null;
+        err instanceof ApiError
+          ? (err.body as { error?: string; details?: string })?.details
+          : null;
       const message =
         err instanceof ApiError
-          ? bodyError ?? `Validation failed (status ${err.status})`
+          ? (bodyError ?? `Validation failed (status ${err.status})`)
           : `Validation failed: ${(err as Error)?.message ?? String(err)}`;
       const detail = bodyDetails ? ` Details: ${bodyDetails}` : '';
       update({
@@ -873,27 +993,23 @@ function UnplayedRow({
 
     setSubmitting(true);
     try {
-      await postJsonAuth(
-        '/results',
-        token,
-        {
-          event_team_id: teamId,
-          event_game_template_id: template.template_id,
-          game_id: Number(draft.replayGameId),
-          score: draft.derivedScore,
-          zero_reason: zeroReasonFromEndCondition(draft.derivedEndConditionCode),
-          bottom_deck_risk: draft.bdr ? Number(draft.bdr) : null,
-          notes: draft.notes || null,
-          played_at: draft.derivedPlayedAt ?? null,
-          players: draft.derivedPlayers ?? [],
-        },
-      );
+      await postJsonAuth('/results', token, {
+        event_team_id: teamId,
+        event_game_template_id: template.template_id,
+        game_id: Number(draft.replayGameId),
+        score: draft.derivedScore,
+        zero_reason: zeroReasonFromEndCondition(draft.derivedEndConditionCode),
+        bottom_deck_risk: draft.bdr ? Number(draft.bdr) : null,
+        notes: draft.notes || null,
+        played_at: draft.derivedPlayedAt ?? null,
+        players: draft.derivedPlayers ?? [],
+      });
       window.location.reload();
     } catch (err) {
       const message =
         err instanceof ApiError
-          ? (err.body as { error?: string })?.error ?? `Submit failed (status ${err.status})`
-          : (err as Error)?.message ?? 'Submit failed';
+          ? ((err.body as { error?: string })?.error ?? `Submit failed (status ${err.status})`)
+          : ((err as Error)?.message ?? 'Submit failed');
       setSubmitError(message);
     } finally {
       setSubmitting(false);
@@ -916,61 +1032,72 @@ function UnplayedRow({
             <span>{template.template_index}</span>
           )}
         </td>
-      <td className="px-3 py-2 text-sm">{template.variant}</td>
-      <td className="px-3 py-2 text-sm text-right">
-        {draft.derivedScore != null ? draft.derivedScore : ''}
-      </td>
-      <td className="px-3 py-2 text-sm">
-        {draft.derivedEndCondition ? draft.derivedEndCondition : ''}
-      </td>
-      <td className="px-3 py-2 text-sm text-right">
-        {editable ? (
-          <input
-            className="input"
-            style={{ width: '72px' }}
-            placeholder="BDR"
-            value={draft.bdr}
-            onChange={(e) => update({ bdr: e.target.value })}
-          />
-        ) : (
-          ''
-        )}
-      </td>
-      <td className="px-3 py-2 text-sm">
-        {draft.derivedPlayers && draft.derivedPlayers.length > 0 ? (
-          <div className="pill-row">
-            {draft.derivedPlayers.map((p) => (
-              <UserPill
-                key={p}
-                name={p}
-                color={memberColors[p]?.color ?? '#777777'}
-                textColor={memberColors[p]?.textColor ?? '#ffffff'}
-              />
-            ))}
-          </div>
-        ) : (
-          ''
-        )}
-      </td>
-      <td className="px-3 py-2 text-sm">
-        {draft.derivedPlayedAt ? <span>{new Date(draft.derivedPlayedAt).toLocaleDateString()}</span> : ''}
-      </td>
-      <td className="px-3 py-2 text-sm">
+        <td className="px-3 py-2 text-sm">{template.variant}</td>
+        <td className="px-3 py-2 text-sm text-right">
+          {draft.derivedScore != null ? draft.derivedScore : ''}
+        </td>
+        <td className="px-3 py-2 text-sm">
+          {draft.derivedEndCondition ? draft.derivedEndCondition : ''}
+        </td>
+        <td className="px-3 py-2 text-sm text-right">
           {editable ? (
-            <div style={{ display: 'grid', gridTemplateColumns: 'auto auto auto', alignItems: 'center', gap: '10px' }}>
-              <input
+            <input
               className="input"
-              style={{ maxWidth: '150px', minWidth: '120px' }}
-              placeholder="Game ID or URL"
-                value={draft.replay}
-              onChange={(e) => validateReplay(e.target.value)}
+              style={{ width: '72px' }}
+              placeholder="BDR"
+              value={draft.bdr}
+              onChange={(e) => update({ bdr: e.target.value })}
             />
-            <StatusIcon draft={draft} />
-            <button
-              className="btn btn--primary btn--sm"
-              disabled={
-                !draft.replayGameId ||
-                Boolean(draft.replayError) ||
+          ) : (
+            ''
+          )}
+        </td>
+        <td className="px-3 py-2 text-sm">
+          {draft.derivedPlayers && draft.derivedPlayers.length > 0 ? (
+            <div className="pill-row">
+              {draft.derivedPlayers.map((p) => (
+                <UserPill
+                  key={p}
+                  name={p}
+                  color={memberColors[p]?.color ?? '#777777'}
+                  textColor={memberColors[p]?.textColor ?? '#ffffff'}
+                />
+              ))}
+            </div>
+          ) : (
+            ''
+          )}
+        </td>
+        <td className="px-3 py-2 text-sm">
+          {draft.derivedPlayedAt ? (
+            <span>{new Date(draft.derivedPlayedAt).toLocaleDateString()}</span>
+          ) : (
+            ''
+          )}
+        </td>
+        <td className="px-3 py-2 text-sm">
+          {editable ? (
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'auto auto auto',
+                alignItems: 'center',
+                gap: '10px',
+              }}
+            >
+              <input
+                className="input"
+                style={{ maxWidth: '150px', minWidth: '120px' }}
+                placeholder="Game ID or URL"
+                value={draft.replay}
+                onChange={(e) => validateReplay(e.target.value)}
+              />
+              <StatusIcon draft={draft} />
+              <button
+                className="btn btn--primary btn--sm"
+                disabled={
+                  !draft.replayGameId ||
+                  Boolean(draft.replayError) ||
                   draft.validateStatus !== 'ok' ||
                   submitting
                 }
@@ -985,8 +1112,8 @@ function UnplayedRow({
           ) : (
             ''
           )}
-      </td>
-      <td className="px-3 py-2 text-sm text-gray-500"></td>
+        </td>
+        <td className="px-3 py-2 text-sm text-gray-500"></td>
       </tr>
       {showNotes && (
         <tr className="border-t bg-gray-50">

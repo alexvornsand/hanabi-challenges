@@ -50,7 +50,9 @@ export function useChallengeDetail(slug: string | undefined) {
 
       try {
         // getJson will add /api → /api/challenges/:slug
-        const data = await getJson<ChallengeDetail>(`/challenges/${encodeURIComponent(currentSlug)}`);
+        const data = await getJson<ChallengeDetail>(
+          `/challenges/${encodeURIComponent(currentSlug)}`,
+        );
 
         if (!cancelled) {
           setState({

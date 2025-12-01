@@ -1,6 +1,10 @@
 // src/modules/auth/auth.routes.ts
 import { Router, type Request, type Response } from 'express';
-import { authRequired, AuthenticatedRequest, requireSuperadmin } from '../../middleware/authMiddleware';
+import {
+  authRequired,
+  AuthenticatedRequest,
+  requireSuperadmin,
+} from '../../middleware/authMiddleware';
 import { loginOrCreateUser, pickTextColor, randomHexColor } from './auth.service';
 import { pool } from '../../config/db';
 

@@ -1,55 +1,73 @@
-import React from 'react';
+import { Link } from 'react-router-dom';
+import { Heading, PageContainer, Prose, Section, Stack } from '../design-system';
 
-export const AboutPage: React.FC = () => {
+export function AboutPage() {
   return (
-    <main className="page stack-sm">
-      <h1 className="text-2xl font-bold">About</h1>
-      <section className="stack-sm">
-        <h2 className="text-xl font-semibold">Mission</h2>
-        <p className="text-gray-700">
-          This site is a hub for Hanabi competitions. We make it easy to find events, register teams,
-          play through preset seeds, and track progress together. The goal is to keep every team on the
-          same page—whether you’re tackling a 100-seed challenge or a smaller sprint with friends.
-        </p>
-      </section>
+    <main>
+      <PageContainer>
+        <Heading level={1}>About Hanabi Challenges</Heading>
+        <Section paddingY="lg">
+          <Stack gap="lg">
+            <Prose>
+              <p>
+                Hanabi Challenges is a home for organized play. We publish shared seed sets, collect
+                results, and surface stats so every team—new or veteran—can compete on equal
+                footing. The focus is clarity: straightforward formats, predictable timelines, and
+                transparent scoring.
+              </p>
+            </Prose>
 
-      <section className="stack-sm">
-        <h2 className="text-xl font-semibold">How it works</h2>
-        <ul className="text-gray-700" style={{ paddingLeft: '20px' }}>
-          <li>Browse current events to see formats, timelines, and seeds.</li>
-          <li>Register your team for the events you want to play.</li>
-          <li>Log games and link replays so results stay in one place.</li>
-          <li>Watch stats update as you progress through each stage.</li>
-        </ul>
-      </section>
+            <Stack as="section" gap="sm">
+              <Heading level={3}>How it works</Heading>
+              <Prose>
+                <ul>
+                  <li>Browse events to see formats, timelines, and seed details.</li>
+                  <li>
+                    Register your team, choose the right size, and set a table password if needed.
+                  </li>
+                  <li>
+                    Play through the shared seeds, upload replays, and watch your progress update
+                    live.
+                  </li>
+                  <li>Review standings and stage stats once events lock or complete.</li>
+                </ul>
+              </Prose>
+            </Stack>
 
-      <section className="stack-sm">
-        <h2 className="text-xl font-semibold">Who’s behind it</h2>
-        <p className="text-gray-700">
-          Built by Hanabi players for the community. We’re iterating quickly—if you spot a bug or want
-          to contribute ideas, please reach out.
-        </p>
-      </section>
+            <Stack as="section" gap="sm">
+              <Heading level={3}>Who’s behind it</Heading>
+              <Prose>
+                <p>
+                  We are Hanabi players building tools we wished existed: faster registration,
+                  cleaner scorekeeping, and more reliable archives. Feedback drives our roadmap—if
+                  something feels clunky or missing, let us know.
+                </p>
+              </Prose>
+            </Stack>
 
-      <section className="stack-sm">
-        <h2 className="text-xl font-semibold">What’s next</h2>
-        <ul className="text-gray-700" style={{ paddingLeft: '20px' }}>
-          <li>More event formats (tournaments and multi-stage structures).</li>
-          <li>Richer stats, leaderboards, and badges.</li>
-          <li>Smoother team tools and replay validation workflows.</li>
-        </ul>
-      </section>
+            <Stack as="section" gap="sm">
+              <Heading level={3}>What’s next</Heading>
+              <Prose>
+                <ul>
+                  <li>Tournaments and multi-stage brackets alongside seasonal challenges.</li>
+                  <li>Deeper stats, historical archives, and richer leaderboards.</li>
+                  <li>Better replay validation and smoother team management workflows.</li>
+                </ul>
+              </Prose>
+            </Stack>
 
-      <section className="stack-sm">
-        <h2 className="text-xl font-semibold">FAQ</h2>
-        <p className="text-gray-700">
-          We’re collecting common questions. Visit the{' '}
-          <a href="/about/FAQ" className="text-blue-700 underline">
-            FAQ page
-          </a>{' '}
-          for more.
-        </p>
-      </section>
+            <Stack as="section" gap="sm">
+              <Heading level={3}>FAQ</Heading>
+              <Prose>
+                <p>
+                  Have questions? Visit the <Link to="/about/FAQ">FAQ page</Link> or reach out so we
+                  can add what you need.
+                </p>
+              </Prose>
+            </Stack>
+          </Stack>
+        </Section>
+      </PageContainer>
     </main>
   );
-};
+}

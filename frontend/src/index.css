@@ -1,6 +1,6 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&family=Roboto+Mono:wght@500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&family=Roboto+Mono:wght@500&family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,300..700,0..1,-50..200');
-@import './styles/tokens.css';
+@import './design-system/styles/tokens.css';
 
 :root {
   color-scheme: light;
@@ -10,7 +10,9 @@
   -moz-osx-font-smoothing: grayscale;
 
   --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --font-mono: 'Roboto Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+  --font-mono:
+    'Roboto Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
+    'Courier New', monospace;
 
   --color-bg: #f8fafc;
   --color-surface: #ffffff;
@@ -227,19 +229,25 @@ textarea {
 .select,
 .textarea {
   width: 100%;
-  padding: 0.55rem 0.7rem;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
-  color: var(--color-text);
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  height: var(--ds-size-control-md-height);
+  padding: 0 var(--ds-size-control-md-paddingX);
+  border-radius: var(--ds-radius-md);
+  border: 1px solid var(--ds-color-border);
+  background: var(--ds-color-surface);
+  color: var(--ds-color-text);
+  font-size: var(--ds-typography-fontSize-body);
+  line-height: calc(var(--ds-size-control-md-height) - 2px);
+  vertical-align: middle;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 .input:focus,
 .select:focus,
 .textarea:focus {
-  outline: 2px solid var(--color-accent-weak);
-  border-color: var(--color-accent);
-  box-shadow: 0 0 0 2px var(--color-accent-weak);
+  outline: 2px solid var(--ds-color-accent-weak, var(--color-accent));
+  border-color: var(--ds-color-accent-strong, var(--color-accent));
+  box-shadow: 0 0 0 2px var(--ds-color-accent-weak, var(--color-accent));
 }
 
 /* Table */
@@ -321,4 +329,16 @@ tbody tr:hover {
   font-size: 16px;
   line-height: 1;
   vertical-align: middle;
+}
+
+.ui-section-title {
+  margin: 0;
+  font-size: var(--font-title-size);
+  font-weight: 700;
+}
+
+.ui-link {
+  color: var(--color-accent);
+  font-weight: 600;
+  text-decoration: underline;
 }

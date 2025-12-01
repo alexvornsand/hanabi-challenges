@@ -17,7 +17,7 @@ echo "Timestamps and full stderr/stdout will be captured."
 osascript <<EOF
 tell application "Terminal"
     activate
-    do script "cd ${ROOT_DIR}/backend && npm install && (npm run dev 2>&1 | tee '${BACKEND_LOG}')"
+    do script "cd ${ROOT_DIR}/backend && npm install && (LOGIN_DEBUG=1 npm run dev 2>&1 | tee '${BACKEND_LOG}')"
 end tell
 EOF
 

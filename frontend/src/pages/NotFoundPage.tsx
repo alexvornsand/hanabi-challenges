@@ -1,14 +1,33 @@
-import React from 'react';
 import { Link } from 'react-router-dom';
+import {
+  Button,
+  Card,
+  CardBody,
+  Heading,
+  PageContainer,
+  Section,
+  Stack,
+  Text,
+} from '../design-system';
 
-export const NotFoundPage: React.FC = () => {
+export function NotFoundPage() {
   return (
-    <div>
-      <h1>404 – Page Not Found</h1>
-      <p>The page you’re looking for doesn’t exist.</p>
-      <p>
-        <Link to="/">Return home</Link>
-      </p>
-    </div>
+    <main>
+      <PageContainer variant="narrow">
+        <Section paddingY="lg">
+          <Card variant="outline">
+            <CardBody>
+              <Stack gap="sm">
+                <Heading level={1}>404 – Page Not Found</Heading>
+                <Text variant="muted">The page you’re looking for doesn’t exist.</Text>
+                <Button as={Link} to="/" variant="primary">
+                  Return home
+                </Button>
+              </Stack>
+            </CardBody>
+          </Card>
+        </Section>
+      </PageContainer>
+    </main>
   );
-};
+}

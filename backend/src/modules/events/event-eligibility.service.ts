@@ -78,7 +78,7 @@ export async function markIneligible(input: {
   const { eventId, teamSize, userId, reason, sourceEventTeamId, client } = input;
   const db = getDb(client);
   const sanitizedReason =
-    reason && reason.length > 255 ? reason.slice(0, 255) : reason ?? 'spoiler_view';
+    reason && reason.length > 255 ? reason.slice(0, 255) : (reason ?? 'spoiler_view');
 
   const result = await db.query<EventPlayerEligibility>(
     `
@@ -116,7 +116,7 @@ export async function markCompleted(input: {
   const { eventId, teamSize, userId, reason, client } = input;
   const db = getDb(client);
   const sanitizedReason =
-    reason && reason.length > 255 ? reason.slice(0, 255) : reason ?? 'completed';
+    reason && reason.length > 255 ? reason.slice(0, 255) : (reason ?? 'completed');
 
   const result = await db.query<EventPlayerEligibility>(
     `

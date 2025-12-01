@@ -100,6 +100,27 @@
   --color-sem-neutral-text-dark: #df9f37;
   --color-sem-negative-text-dark: #cc2e48;
 
+  /* Alerts */
+  --alert-bg-success: #ecfdf3;
+  --alert-text-success: #2f7456;
+  --alert-bg-success-dark: #064e3b;
+  --alert-text-success-dark: #d1fae5;
+
+  --alert-bg-info: #eef2ff;
+  --alert-text-info: #312e81;
+  --alert-bg-info-dark: #1e1b4b;
+  --alert-text-info-dark: #e0e7ff;
+
+  --alert-bg-warning: #fff7ed;
+  --alert-text-warning: #92400e;
+  --alert-bg-warning-dark: #431407;
+  --alert-text-warning-dark: #fed7aa;
+
+  --alert-bg-error: #fef2f2;
+  --alert-text-error: #b91c1c;
+  --alert-bg-error-dark: #7f1d1d;
+  --alert-text-error-dark: #fecdd3;
+
   /* Buttons */
   --button-padding-y: var(--space-xs); /* 8px */
   --button-padding-x: var(--space-sm); /* 12px */
@@ -144,6 +165,7 @@
 
   /* Layout / sizing */
   --max-width-panel: 720px;
+  --max-width-narrow: 640px;
   --max-width-page: 1100px;
   --page-padding: var(--space-md);
   --section-padding-y: var(--space-md);

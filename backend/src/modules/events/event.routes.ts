@@ -1,6 +1,11 @@
 // src/modules/events/event.routes.ts
 import { Router, Request, Response } from 'express';
-import { authRequired, authOptional, requireAdmin, AuthenticatedRequest } from '../../middleware/authMiddleware';
+import {
+  authRequired,
+  authOptional,
+  requireAdmin,
+  AuthenticatedRequest,
+} from '../../middleware/authMiddleware';
 import {
   listEvents,
   createEvent,
@@ -34,7 +39,11 @@ function isAdminUser(req: AuthenticatedRequest): boolean {
   return role === 'ADMIN' || role === 'SUPERADMIN';
 }
 
-function validateLength(field: string, value: string | null | undefined, opts: { min?: number; max?: number }) {
+function validateLength(
+  field: string,
+  value: string | null | undefined,
+  opts: { min?: number; max?: number },
+) {
   if (value == null) return null;
   if (typeof value !== 'string') {
     return `${field} must be a string`;
@@ -53,10 +62,7 @@ function validateLength(field: string, value: string | null | undefined, opts: {
  *  Helper: look up numeric event_id from slug
  * ----------------------------------------*/
 async function getEventId(slug: string): Promise<number | null> {
-  const result = await pool.query<{ id: number }>(
-    `SELECT id FROM events WHERE slug = $1`,
-    [slug],
-  );
+  const result = await pool.query<{ id: number }>(`SELECT id FROM events WHERE slug = $1`, [slug]);
   return result.rowCount > 0 ? result.rows[0].id : null;
 }
 
@@ -78,31 +84,36 @@ router.get('/', authOptional, async (req: AuthenticatedRequest, res: Response) =
  *  GET /api/events/:slug/eligibility/me
  *  Return ineligibility rows for the current user (optionally filtered by team_size)
  * ----------------------------------------*/
-router.get('/:slug/eligibility/me', authRequired, async (req: AuthenticatedRequest, res: Response) => {
-  const { slug } = req.params;
-  const teamSizeRaw = (req.query.team_size as string | undefined) ?? (req.query.teamSize as string | undefined);
-  const teamSize = teamSizeRaw != null ? Number(teamSizeRaw) : null;
+router.get(
+  '/:slug/eligibility/me',
+  authRequired,
+  async (req: AuthenticatedRequest, res: Response) => {
+    const { slug } = req.params;
+    const teamSizeRaw =
+      (req.query.team_size as string | undefined) ?? (req.query.teamSize as string | undefined);
+    const teamSize = teamSizeRaw != null ? Number(teamSizeRaw) : null;
 
-  if (teamSizeRaw != null && (!Number.isInteger(teamSize) || teamSize < 2 || teamSize > 6)) {
-    return res.status(400).json({ error: 'team_size must be an integer between 2 and 6' });
-  }
+    if (teamSizeRaw != null && (!Number.isInteger(teamSize) || teamSize < 2 || teamSize > 6)) {
+      return res.status(400).json({ error: 'team_size must be an integer between 2 and 6' });
+    }
 
-  try {
-    const eventId = await getEventId(slug);
-    if (!eventId) return res.status(404).json({ error: 'Event not found' });
+    try {
+      const eventId = await getEventId(slug);
+      if (!eventId) return res.status(404).json({ error: 'Event not found' });
 
-    const entries = await listEligibilityForUser({
-      eventId,
-      userId: req.user!.userId,
-      teamSize: teamSize ?? undefined,
-    });
+      const entries = await listEligibilityForUser({
+        eventId,
+        userId: req.user!.userId,
+        teamSize: teamSize ?? undefined,
+      });
 
-    res.json(entries);
-  } catch (err) {
-    console.error('Error fetching eligibility:', err);
-    res.status(500).json({ error: 'Failed to fetch eligibility' });
-  }
-});
+      res.json(entries);
+    } catch (err) {
+      console.error('Error fetching eligibility:', err);
+      res.status(500).json({ error: 'Failed to fetch eligibility' });
+    }
+  },
+);
 
 /* ------------------------------------------
  *  POST /api/events/:slug/eligibility/spoilers
@@ -113,13 +124,23 @@ router.post(
   authRequired,
   async (req: AuthenticatedRequest, res: Response) => {
     const { slug } = req.params;
-    const { team_size, teamSize, source_event_team_id, sourceEventTeamId, reason, all_team_sizes, allTeamSizes } =
-      req.body ?? {};
+    const {
+      team_size,
+      teamSize,
+      source_event_team_id,
+      sourceEventTeamId,
+      reason,
+      all_team_sizes,
+      allTeamSizes,
+    } = req.body ?? {};
 
     const applyAll = Boolean(all_team_sizes ?? allTeamSizes);
-    const sizeValue = applyAll ? null : team_size ?? teamSize;
+    const sizeValue = applyAll ? null : (team_size ?? teamSize);
     const parsedSize = sizeValue != null ? Number(sizeValue) : null;
-    if (!applyAll && (parsedSize == null || !Number.isInteger(parsedSize) || parsedSize < 2 || parsedSize > 6)) {
+    if (
+      !applyAll &&
+      (parsedSize == null || !Number.isInteger(parsedSize) || parsedSize < 2 || parsedSize > 6)
+    ) {
       return res.status(400).json({ error: 'team_size must be an integer between 2 and 6' });
     }
 
@@ -142,7 +163,9 @@ router.post(
         if (teamRow && teamRow.team_size !== parsedSize) {
           return res
             .status(400)
-            .json({ error: `source_event_team_id is a ${teamRow.team_size}p team, not ${parsedSize}p` });
+            .json({
+              error: `source_event_team_id is a ${teamRow.team_size}p team, not ${parsedSize}p`,
+            });
         }
       }
 
@@ -156,13 +179,22 @@ router.post(
 
       // Block if any enrolled exists and we are applying to all, or if the specific size is enrolled
       if (applyAll) {
-        if (hasBlockingStatus(existingRows.filter((r) => sizesToApply.includes(r.team_size)), 'ENROLLED')) {
-          return res.status(403).json({ error: 'Cannot view spoilers while enrolled for any team size' });
+        if (
+          hasBlockingStatus(
+            existingRows.filter((r) => sizesToApply.includes(r.team_size)),
+            'ENROLLED',
+          )
+        ) {
+          return res
+            .status(403)
+            .json({ error: 'Cannot view spoilers while enrolled for any team size' });
         }
       } else {
         const existingForSize = existingRows.find((r) => r.team_size === parsedSize);
         if (existingForSize?.status === 'ENROLLED') {
-          return res.status(403).json({ error: 'Cannot view spoilers while enrolled for this team size' });
+          return res
+            .status(403)
+            .json({ error: 'Cannot view spoilers while enrolled for this team size' });
         }
       }
 
@@ -280,6 +312,7 @@ router.post('/:slug/register', authRequired, async (req: AuthenticatedRequest, r
       id: number;
       published: boolean;
       allow_late_registration: boolean;
+      registration_opens_at: string | null;
       registration_cutoff: string | null;
       starts_at: string | null;
       ends_at: string | null;
@@ -289,6 +322,7 @@ router.post('/:slug/register', authRequired, async (req: AuthenticatedRequest, r
         id,
         published,
         allow_late_registration,
+        registration_opens_at,
         registration_cutoff,
         starts_at,
         ends_at
@@ -305,6 +339,7 @@ router.post('/:slug/register', authRequired, async (req: AuthenticatedRequest, r
       id: number;
       published: boolean;
       allow_late_registration: boolean;
+      registration_opens_at: string | null;
       registration_cutoff: string | null;
       starts_at: string | null;
       ends_at: string | null;
@@ -313,6 +348,11 @@ router.post('/:slug/register', authRequired, async (req: AuthenticatedRequest, r
     const isAdmin = isAdminUser(req);
 
     const now = new Date();
+    const registrationOpens = eventRow.registration_opens_at
+      ? new Date(eventRow.registration_opens_at)
+      : eventRow.starts_at
+        ? new Date(eventRow.starts_at)
+        : null;
     const startsAt = eventRow.starts_at ? new Date(eventRow.starts_at) : null;
     const endsAt = eventRow.ends_at ? new Date(eventRow.ends_at) : null;
     const cutoff = eventRow.registration_cutoff ? new Date(eventRow.registration_cutoff) : null;
@@ -336,7 +376,7 @@ router.post('/:slug/register', authRequired, async (req: AuthenticatedRequest, r
     }
 
     if (!isAdmin) {
-      if (startsAt && now < startsAt) {
+      if (registrationOpens && now < registrationOpens) {
         await client.query('ROLLBACK');
         return res.status(403).json({ error: 'Registration has not opened yet' });
       }
@@ -421,8 +461,8 @@ router.post('/:slug/register', authRequired, async (req: AuthenticatedRequest, r
 
         await client.query('ROLLBACK');
         return res.status(409).json({
-          error: `These users already have a ${sizeNum}p team for this event: ${conflictCheck
-            .rows.map((r: { display_name: string }) => r.display_name)
+          error: `These users already have a ${sizeNum}p team for this event: ${conflictCheck.rows
+            .map((r: { display_name: string }) => r.display_name)
             .join(', ')}`,
         });
       }
@@ -521,209 +561,237 @@ router.post('/:slug/register', authRequired, async (req: AuthenticatedRequest, r
  *  POST /api/events/:slug/teams/:teamId/validate-replay
  *  Live-validate a replay URL/ID against team + template
  * ----------------------------------------*/
-router.post('/:slug/teams/:teamId/validate-replay', authRequired, async (req: AuthenticatedRequest, res: Response) => {
-  const { slug, teamId } = req.params;
-  const body = req.body as { template_id?: number; templateId?: number; replay?: string };
-  const templateIdRaw = body.template_id ?? body.templateId ?? (req.query.template_id as string | undefined);
-  const template_id = templateIdRaw != null ? Number(templateIdRaw) : undefined;
-  const { replay } = body;
-  let step = 'start';
+router.post(
+  '/:slug/teams/:teamId/validate-replay',
+  authRequired,
+  async (req: AuthenticatedRequest, res: Response) => {
+    const { slug, teamId } = req.params;
+    const body = req.body as { template_id?: number; templateId?: number; replay?: string };
+    const templateIdRaw =
+      body.template_id ?? body.templateId ?? (req.query.template_id as string | undefined);
+    const template_id = templateIdRaw != null ? Number(templateIdRaw) : undefined;
+    const { replay } = body;
+    let step = 'start';
 
-  console.log('[validate-replay] start', {
-    slug,
-    teamId,
-    template_id,
-    replaySnippet: replay?.slice?.(0, 100),
-  });
+    console.log('[validate-replay] start', {
+      slug,
+      teamId,
+      template_id,
+      replaySnippet: replay?.slice?.(0, 100),
+    });
 
-  if (!template_id || Number.isNaN(template_id) || !replay) {
-    console.warn('[validate-replay] missing fields', { template_id, replayPresent: !!replay });
-    return res.status(400).json({ error: 'template_id and replay are required' });
-  }
+    if (!template_id || Number.isNaN(template_id) || !replay) {
+      console.warn('[validate-replay] missing fields', { template_id, replayPresent: !!replay });
+      return res.status(400).json({ error: 'template_id and replay are required' });
+    }
 
-  const gameId = parseGameId(replay);
-  if (!gameId) {
-    console.warn('[validate-replay] parse fail', { replay });
-    return res.status(400).json({ error: 'Unable to parse game id from replay/link' });
-  }
+    const gameId = parseGameId(replay);
+    if (!gameId) {
+      console.warn('[validate-replay] parse fail', { replay });
+      return res.status(400).json({ error: 'Unable to parse game id from replay/link' });
+    }
 
-  const teamIdNum = Number(teamId);
-  if (!Number.isInteger(teamIdNum)) {
-    return res.status(400).json({ error: 'Invalid team id' });
-  }
+    const teamIdNum = Number(teamId);
+    if (!Number.isInteger(teamIdNum)) {
+      return res.status(400).json({ error: 'Invalid team id' });
+    }
 
-  try {
-    step = 'lookup event';
-    const eventId = await getEventId(slug);
-    if (!eventId) return res.status(404).json({ error: 'Event not found' });
-    console.log('[validate-replay] event', { eventId });
+    try {
+      step = 'lookup event';
+      const eventId = await getEventId(slug);
+      if (!eventId) return res.status(404).json({ error: 'Event not found' });
+      console.log('[validate-replay] event', { eventId });
 
-    step = 'lookup team';
-    const teamResult = await pool.query(
-      `
+      step = 'lookup team';
+      const teamResult = await pool.query(
+        `
       SELECT id, team_size, event_id
       FROM event_teams
       WHERE id = $1 AND event_id = $2;
       `,
-      [teamIdNum, eventId],
-    );
-    if (teamResult.rowCount === 0) {
-      return res.status(404).json({ error: 'Team not found for this event' });
-    }
-    const team = teamResult.rows[0] as { id: number; team_size: number; event_id: number };
-    console.log('[validate-replay] team', { team });
+        [teamIdNum, eventId],
+      );
+      if (teamResult.rowCount === 0) {
+        return res.status(404).json({ error: 'Team not found for this event' });
+      }
+      const team = teamResult.rows[0] as { id: number; team_size: number; event_id: number };
+      console.log('[validate-replay] team', { team });
 
-    step = 'lookup template';
-    const tplResult = await pool.query(
-      `
+      step = 'lookup template';
+      const tplResult = await pool.query(
+        `
       SELECT egt.id, egt.seed_payload, egt.variant, es.event_id
       FROM event_game_templates egt
       JOIN event_stages es ON es.event_stage_id = egt.event_stage_id
       WHERE egt.id = $1;
       `,
-      [template_id],
-    );
-    if (tplResult.rowCount === 0) {
-      return res.status(404).json({ error: 'Template not found' });
-    }
-    const tpl = tplResult.rows[0] as { id: number; seed_payload: string | null; variant: string; event_id: number };
-    if (tpl.event_id !== eventId) {
-      return res.status(400).json({ error: 'Template does not belong to this event' });
-    }
-    console.log('[validate-replay] template', { tpl });
-
-    const members = await listTeamMembers(team.id);
-    const memberNames = members.map((m) => m.display_name);
-    console.log('[validate-replay] members', memberNames);
-
-    // Stage 1: fetch export and validate players/seed/size
-    step = 'fetch export';
-    const exportJson = await fetchJsonWithTimeout(`https://hanab.live/export/${gameId}`);
-    console.log('[validate-replay] export fetched', {
-      keys: Object.keys(exportJson ?? {}),
-      players: exportJson?.players ?? exportJson?.playerNames ?? exportJson?.player_names,
-      seed: exportJson?.seed,
-    });
-    if (!exportJson || typeof exportJson !== 'object') {
-      return res.status(400).json({ error: 'Invalid export payload from hanab.live' });
-    }
-    const exportPlayers =
-      exportJson.players ??
-      exportJson.playerNames ??
-      exportJson.player_names ??
-      [];
-    const seedString = exportJson.seed ?? '';
-
-    // Check players subset
-    const missingPlayers = exportPlayers.filter((p) => !memberNames.includes(p));
-    if (missingPlayers.length > 0) {
-      return res.status(400).json({ error: `Replay includes players not on this team: ${missingPlayers.join(', ')}` });
-    }
-
-    // Check seed and player count from seed string
-    const seedMatch = seedString.match(/p(\d+)v\d+s([A-Za-z0-9]+)/);
-    if (!seedMatch) {
-      return res.status(400).json({ error: 'Seed string from replay is not in expected format' });
-    }
-    const seedPlayers = Number(seedMatch[1]);
-    const seedSuffix = seedMatch[2];
-    console.log('[validate-replay] seed parsed', { seedPlayers, seedSuffix });
-    if (seedPlayers !== team.team_size) {
-      return res.status(400).json({ error: `Replay is for ${seedPlayers}p but team is ${team.team_size}p` });
-    }
-    if (tpl.seed_payload && seedSuffix !== tpl.seed_payload) {
-      return res.status(400).json({ error: `Replay seed ${seedSuffix} does not match template seed ${tpl.seed_payload}` });
-    }
-
-    // Stage 2: fetch history-full for first player and check variant/flags/score
-    let historyData: any = null;
-    if (exportPlayers.length > 0) {
-      const player = exportPlayers[0];
-      step = 'fetch history';
-      historyData = await fetchJsonWithTimeout(
-        `https://hanab.live/api/v1/history-full/${encodeURIComponent(player)}?start=${gameId}&end=${gameId}`,
+        [template_id],
       );
-      console.log('[validate-replay] history fetched', {
-        player,
-        keys: historyData ? Object.keys(historyData) : [],
-        array: Array.isArray(historyData),
-      });
-    }
-
-    let historyVariant = null;
-    let flagsOk = true;
-    let score: number | null = null;
-    let endCondition: number | null = null;
-    let playedAt: string | null = null;
-
-    // history-full returns an array for single-user queries. For multi-user it can be {games: []}
-    const historyGames = Array.isArray(historyData)
-      ? historyData
-      : Array.isArray(historyData?.games)
-        ? historyData.games
-        : [];
-
-    if (historyGames.length > 0) {
-      const game = historyGames.find(
-        (g: any) => String(g.id ?? g.gameId ?? g.game_id) === String(gameId),
-      );
-      if (game) {
-        const opts = game.options ?? {};
-        historyVariant = game.variantName ?? opts.variantName ?? game.variant ?? opts.variant;
-        const flags = {
-          cardCycle: game.cardCycle ?? opts.cardCycle,
-          deckPlays: game.deckPlays ?? opts.deckPlays,
-          emptyClues: game.emptyClues ?? opts.emptyClues,
-          oneExtraCard: game.oneExtraCard ?? opts.oneExtraCard,
-          oneLessCard: game.oneLessCard ?? opts.oneLessCard,
-          allOrNothing: game.allOrNothing ?? opts.allOrNothing,
-          detrimentalCharacters: game.detrimentalCharacters ?? opts.detrimentalCharacters,
-        };
-        flagsOk = Object.values(flags).every((v) => v === false || v === undefined);
-        score = game.score ?? null;
-        endCondition = game.endCondition ?? null;
-        playedAt = game.datetimeFinished ?? game.datetimeFinishedUtc ?? game.datetime_finished ?? null;
+      if (tplResult.rowCount === 0) {
+        return res.status(404).json({ error: 'Template not found' });
       }
-    }
+      const tpl = tplResult.rows[0] as {
+        id: number;
+        seed_payload: string | null;
+        variant: string;
+        event_id: number;
+      };
+      if (tpl.event_id !== eventId) {
+        return res.status(400).json({ error: 'Template does not belong to this event' });
+      }
+      console.log('[validate-replay] template', { tpl });
 
-    if (historyVariant && historyVariant !== tpl.variant) {
-      return res.status(400).json({ error: `Replay variant ${historyVariant} does not match template variant ${tpl.variant}` });
-    }
-    if (!flagsOk) {
-      return res.status(400).json({ error: 'Replay uses unsupported optional rules (flags should be false)' });
-    }
+      const members = await listTeamMembers(team.id);
+      const memberNames = members.map((m) => m.display_name);
+      console.log('[validate-replay] members', memberNames);
 
-    console.log('[validate-replay] success', {
-      gameId,
-      exportPlayers,
-      seedString,
-      derived: { seedSuffix, seedPlayers, historyVariant, score, endCondition, playedAt },
-    });
+      // Stage 1: fetch export and validate players/seed/size
+      step = 'fetch export';
+      const exportJson = await fetchJsonWithTimeout(`https://hanab.live/export/${gameId}`);
+      console.log('[validate-replay] export fetched', {
+        keys: Object.keys(exportJson ?? {}),
+        players: exportJson?.players ?? exportJson?.playerNames ?? exportJson?.player_names,
+        seed: exportJson?.seed,
+      });
+      if (!exportJson || typeof exportJson !== 'object') {
+        return res.status(400).json({ error: 'Invalid export payload from hanab.live' });
+      }
+      const exportPlayers =
+        exportJson.players ?? exportJson.playerNames ?? exportJson.player_names ?? [];
+      const seedString = exportJson.seed ?? '';
 
-    return res.json({
-      ok: true,
-      gameId,
-      export: {
-        players: exportPlayers,
-        seed: seedString,
-      },
-      derived: {
-        seedSuffix,
-        teamSize: seedPlayers,
-        variant: historyVariant ?? tpl.variant,
-        score,
-        endCondition,
-        playedAt,
-      },
-    });
-  } catch (err) {
-    const e = err as { message?: string; code?: string; stack?: string };
-    const message = e.message ?? 'Failed to validate replay';
-    if (message === 'timeout') {
-      return res
-        .status(504)
-        .json({ error: 'Validation timed out contacting hanab.live', code: 'TIMEOUT', details: message, step });
-    }
+      // Check players subset
+      const missingPlayers = exportPlayers.filter((p) => !memberNames.includes(p));
+      if (missingPlayers.length > 0) {
+        return res
+          .status(400)
+          .json({
+            error: `Replay includes players not on this team: ${missingPlayers.join(', ')}`,
+          });
+      }
+
+      // Check seed and player count from seed string
+      const seedMatch = seedString.match(/p(\d+)v\d+s([A-Za-z0-9]+)/);
+      if (!seedMatch) {
+        return res.status(400).json({ error: 'Seed string from replay is not in expected format' });
+      }
+      const seedPlayers = Number(seedMatch[1]);
+      const seedSuffix = seedMatch[2];
+      console.log('[validate-replay] seed parsed', { seedPlayers, seedSuffix });
+      if (seedPlayers !== team.team_size) {
+        return res
+          .status(400)
+          .json({ error: `Replay is for ${seedPlayers}p but team is ${team.team_size}p` });
+      }
+      if (tpl.seed_payload && seedSuffix !== tpl.seed_payload) {
+        return res
+          .status(400)
+          .json({
+            error: `Replay seed ${seedSuffix} does not match template seed ${tpl.seed_payload}`,
+          });
+      }
+
+      // Stage 2: fetch history-full for first player and check variant/flags/score
+      let historyData: any = null;
+      if (exportPlayers.length > 0) {
+        const player = exportPlayers[0];
+        step = 'fetch history';
+        historyData = await fetchJsonWithTimeout(
+          `https://hanab.live/api/v1/history-full/${encodeURIComponent(player)}?start=${gameId}&end=${gameId}`,
+        );
+        console.log('[validate-replay] history fetched', {
+          player,
+          keys: historyData ? Object.keys(historyData) : [],
+          array: Array.isArray(historyData),
+        });
+      }
+
+      let historyVariant = null;
+      let flagsOk = true;
+      let score: number | null = null;
+      let endCondition: number | null = null;
+      let playedAt: string | null = null;
+
+      // history-full returns an array for single-user queries. For multi-user it can be {games: []}
+      const historyGames = Array.isArray(historyData)
+        ? historyData
+        : Array.isArray(historyData?.games)
+          ? historyData.games
+          : [];
+
+      if (historyGames.length > 0) {
+        const game = historyGames.find(
+          (g: any) => String(g.id ?? g.gameId ?? g.game_id) === String(gameId),
+        );
+        if (game) {
+          const opts = game.options ?? {};
+          historyVariant = game.variantName ?? opts.variantName ?? game.variant ?? opts.variant;
+          const flags = {
+            cardCycle: game.cardCycle ?? opts.cardCycle,
+            deckPlays: game.deckPlays ?? opts.deckPlays,
+            emptyClues: game.emptyClues ?? opts.emptyClues,
+            oneExtraCard: game.oneExtraCard ?? opts.oneExtraCard,
+            oneLessCard: game.oneLessCard ?? opts.oneLessCard,
+            allOrNothing: game.allOrNothing ?? opts.allOrNothing,
+            detrimentalCharacters: game.detrimentalCharacters ?? opts.detrimentalCharacters,
+          };
+          flagsOk = Object.values(flags).every((v) => v === false || v === undefined);
+          score = game.score ?? null;
+          endCondition = game.endCondition ?? null;
+          playedAt =
+            game.datetimeFinished ?? game.datetimeFinishedUtc ?? game.datetime_finished ?? null;
+        }
+      }
+
+      if (historyVariant && historyVariant !== tpl.variant) {
+        return res
+          .status(400)
+          .json({
+            error: `Replay variant ${historyVariant} does not match template variant ${tpl.variant}`,
+          });
+      }
+      if (!flagsOk) {
+        return res
+          .status(400)
+          .json({ error: 'Replay uses unsupported optional rules (flags should be false)' });
+      }
+
+      console.log('[validate-replay] success', {
+        gameId,
+        exportPlayers,
+        seedString,
+        derived: { seedSuffix, seedPlayers, historyVariant, score, endCondition, playedAt },
+      });
+
+      return res.json({
+        ok: true,
+        gameId,
+        export: {
+          players: exportPlayers,
+          seed: seedString,
+        },
+        derived: {
+          seedSuffix,
+          teamSize: seedPlayers,
+          variant: historyVariant ?? tpl.variant,
+          score,
+          endCondition,
+          playedAt,
+        },
+      });
+    } catch (err) {
+      const e = err as { message?: string; code?: string; stack?: string };
+      const message = e.message ?? 'Failed to validate replay';
+      if (message === 'timeout') {
+        return res
+          .status(504)
+          .json({
+            error: 'Validation timed out contacting hanab.live',
+            code: 'TIMEOUT',
+            details: message,
+            step,
+          });
+      }
       console.error('Error validating replay:', err);
       res.status(502).json({
         error: `Failed to validate replay: ${message}`,
@@ -731,8 +799,9 @@ router.post('/:slug/teams/:teamId/validate-replay', authRequired, async (req: Au
         details: e.stack ?? String(err),
         step,
       });
-  }
-});
+    }
+  },
+);
 
 async function fetchJsonWithTimeout(url: string, ms = 4000) {
   const controller = new AbortController();
@@ -772,7 +841,12 @@ router.post('/', authRequired, requireAdmin, async (req: Request, res: Response)
     starts_at,
     ends_at,
     published,
+    event_format = 'challenge',
+    round_robin_enabled = false,
+    max_teams = null,
+    max_rounds = null,
     allow_late_registration,
+    registration_opens_at,
     registration_cutoff,
   } = req.body;
 
@@ -796,14 +870,61 @@ router.post('/', authRequired, requireAdmin, async (req: Request, res: Response)
   });
   if (longDescError) return res.status(400).json({ error: longDescError });
 
-  if (starts_at && ends_at) {
-    const startDate = new Date(starts_at);
-    const endDate = new Date(ends_at);
-    if (!Number.isFinite(startDate.getTime()) || !Number.isFinite(endDate.getTime())) {
-      return res.status(400).json({ error: 'Invalid date format for starts_at or ends_at' });
+  const startDate = starts_at ? new Date(starts_at) : null;
+  const endDate = ends_at ? new Date(ends_at) : null;
+  const regOpensDate = registration_opens_at ? new Date(registration_opens_at) : null;
+  const format = event_format ?? 'challenge';
+
+  if (format !== 'challenge' && format !== 'tournament') {
+    return res.status(400).json({ error: 'event_format must be "challenge" or "tournament"' });
+  }
+
+  const maxTeamsVal = max_teams == null ? null : Number(max_teams);
+  const maxRoundsVal = max_rounds == null ? null : Number(max_rounds);
+  if (Number.isNaN(maxTeamsVal) || Number.isNaN(maxRoundsVal)) {
+    return res.status(400).json({ error: 'max_teams/max_rounds must be numbers when provided' });
+  }
+  if (maxTeamsVal != null && maxTeamsVal <= 0) {
+    return res.status(400).json({ error: 'max_teams must be positive when provided' });
+  }
+  if (maxRoundsVal != null && maxRoundsVal <= 0) {
+    return res.status(400).json({ error: 'max_rounds must be positive when provided' });
+  }
+  if (format === 'tournament') {
+    if (
+      (maxTeamsVal == null && maxRoundsVal == null) ||
+      (maxTeamsVal != null && maxRoundsVal != null)
+    ) {
+      return res
+        .status(400)
+        .json({ error: 'Provide exactly one of max_teams or max_rounds for tournaments' });
     }
-    if (endDate <= startDate) {
-      return res.status(400).json({ error: 'ends_at must be after starts_at' });
+  }
+  const normalizedMaxTeams = format === 'tournament' ? maxTeamsVal : null;
+  const normalizedMaxRounds = format === 'tournament' ? maxRoundsVal : null;
+  const normalizedRoundRobin = format === 'tournament' ? Boolean(round_robin_enabled) : false;
+
+  if (starts_at && !Number.isFinite(startDate?.getTime() ?? NaN)) {
+    return res.status(400).json({ error: 'Invalid date format for starts_at' });
+  }
+  if (ends_at && !Number.isFinite(endDate?.getTime() ?? NaN)) {
+    return res.status(400).json({ error: 'Invalid date format for ends_at' });
+  }
+  if (registration_opens_at && !Number.isFinite(regOpensDate?.getTime() ?? NaN)) {
+    return res.status(400).json({ error: 'Invalid date format for registration_opens_at' });
+  }
+  if (startDate && endDate && endDate <= startDate) {
+    return res.status(400).json({ error: 'ends_at must be after starts_at' });
+  }
+  if (regOpensDate && registration_cutoff) {
+    const cutoffDate = new Date(registration_cutoff);
+    if (!Number.isFinite(cutoffDate.getTime())) {
+      return res.status(400).json({ error: 'Invalid date format for registration_cutoff' });
+    }
+    if (cutoffDate <= regOpensDate) {
+      return res
+        .status(400)
+        .json({ error: 'registration_cutoff must be after registration_opens_at' });
     }
   }
 
@@ -814,7 +935,12 @@ router.post('/', authRequired, requireAdmin, async (req: Request, res: Response)
       short_description: short_description ?? null,
       long_description,
       published: published ?? false,
+      event_format: format,
+      round_robin_enabled: normalizedRoundRobin,
+      max_teams: normalizedMaxTeams,
+      max_rounds: normalizedMaxRounds,
       allow_late_registration: allow_late_registration ?? true,
+      registration_opens_at: registration_opens_at ?? null,
       registration_cutoff: registration_cutoff ?? null,
       starts_at: starts_at ?? null,
       ends_at: ends_at ?? null,
@@ -837,8 +963,22 @@ router.post('/', authRequired, requireAdmin, async (req: Request, res: Response)
  * ----------------------------------------*/
 router.put('/:slug', authRequired, requireAdmin, async (req: Request, res: Response) => {
   const { slug } = req.params;
-  const { name, new_slug, short_description, long_description, starts_at, ends_at, published } =
-    req.body;
+  const {
+    name,
+    new_slug,
+    short_description,
+    long_description,
+    starts_at,
+    ends_at,
+    published,
+    event_format,
+    round_robin_enabled,
+    max_teams = null,
+    max_rounds = null,
+    allow_late_registration,
+    registration_opens_at,
+    registration_cutoff,
+  } = req.body;
 
   if (new_slug) {
     const slugError = validateSlug(new_slug);
@@ -865,16 +1005,72 @@ router.put('/:slug', authRequired, requireAdmin, async (req: Request, res: Respo
     if (longDescError) return res.status(400).json({ error: longDescError });
   }
 
-  if (starts_at && ends_at) {
-    const startDate = new Date(starts_at);
-    const endDate = new Date(ends_at);
-    if (!Number.isFinite(startDate.getTime()) || !Number.isFinite(endDate.getTime())) {
-      return res.status(400).json({ error: 'Invalid date format for starts_at or ends_at' });
-    }
-    if (endDate <= startDate) {
-      return res.status(400).json({ error: 'ends_at must be after starts_at' });
+  const startDate = starts_at ? new Date(starts_at) : null;
+  const endDate = ends_at ? new Date(ends_at) : null;
+  const regOpensDate = registration_opens_at ? new Date(registration_opens_at) : null;
+  const cutoffDate = registration_cutoff ? new Date(registration_cutoff) : null;
+  const format = event_format ?? undefined;
+
+  if (format && format !== 'challenge' && format !== 'tournament') {
+    return res.status(400).json({ error: 'event_format must be "challenge" or "tournament"' });
+  }
+
+  const maxTeamsVal = max_teams == null ? undefined : Number(max_teams);
+  const maxRoundsVal = max_rounds == null ? undefined : Number(max_rounds);
+  if (
+    (maxTeamsVal !== undefined && Number.isNaN(maxTeamsVal)) ||
+    (maxRoundsVal !== undefined && Number.isNaN(maxRoundsVal))
+  ) {
+    return res.status(400).json({ error: 'max_teams/max_rounds must be numbers when provided' });
+  }
+  if (maxTeamsVal !== undefined && maxTeamsVal <= 0) {
+    return res.status(400).json({ error: 'max_teams must be positive when provided' });
+  }
+  if (maxRoundsVal !== undefined && maxRoundsVal <= 0) {
+    return res.status(400).json({ error: 'max_rounds must be positive when provided' });
+  }
+  if (format === 'tournament') {
+    if (
+      (maxTeamsVal == null && maxRoundsVal == null) ||
+      (maxTeamsVal != null && maxRoundsVal != null)
+    ) {
+      return res
+        .status(400)
+        .json({ error: 'Provide exactly one of max_teams or max_rounds for tournaments' });
     }
   }
+
+  if (starts_at && !Number.isFinite(startDate?.getTime() ?? NaN)) {
+    return res.status(400).json({ error: 'Invalid date format for starts_at' });
+  }
+  if (ends_at && !Number.isFinite(endDate?.getTime() ?? NaN)) {
+    return res.status(400).json({ error: 'Invalid date format for ends_at' });
+  }
+  if (registration_opens_at && !Number.isFinite(regOpensDate?.getTime() ?? NaN)) {
+    return res.status(400).json({ error: 'Invalid date format for registration_opens_at' });
+  }
+  if (registration_cutoff && !Number.isFinite(cutoffDate?.getTime() ?? NaN)) {
+    return res.status(400).json({ error: 'Invalid date format for registration_cutoff' });
+  }
+  if (startDate && endDate && endDate <= startDate) {
+    return res.status(400).json({ error: 'ends_at must be after starts_at' });
+  }
+  if (regOpensDate && cutoffDate && cutoffDate <= regOpensDate) {
+    return res
+      .status(400)
+      .json({ error: 'registration_cutoff must be after registration_opens_at' });
+  }
+
+  // Normalize optional tournament fields; if format not provided, leave undefined to avoid clobbering.
+  const normalizedMaxTeams =
+    format === 'tournament' ? (maxTeamsVal ?? null) : maxTeamsVal === undefined ? undefined : null;
+  const normalizedMaxRounds =
+    format === 'tournament'
+      ? (maxRoundsVal ?? null)
+      : maxRoundsVal === undefined
+        ? undefined
+        : null;
+  const normalizedRoundRobin = format === 'tournament' ? Boolean(round_robin_enabled) : undefined;
 
   try {
     const updated = await updateEventBySlug(slug, {
@@ -883,6 +1079,13 @@ router.put('/:slug', authRequired, requireAdmin, async (req: Request, res: Respo
       short_description: short_description ?? undefined,
       long_description,
       published,
+      event_format: format,
+      round_robin_enabled: normalizedRoundRobin,
+      max_teams: normalizedMaxTeams,
+      max_rounds: normalizedMaxRounds,
+      allow_late_registration,
+      registration_opens_at,
+      registration_cutoff,
       starts_at: starts_at ?? undefined,
       ends_at: ends_at ?? undefined,
     });
@@ -1064,7 +1267,8 @@ router.get('/:slug/teams', async (req: Request, res: Response) => {
  * ----------------------------------------*/
 router.get('/:slug/stats', async (req: Request, res: Response) => {
   const { slug } = req.params;
-  const teamSizeRaw = (req.query.team_size as string | undefined) ?? (req.query.teamSize as string | undefined);
+  const teamSizeRaw =
+    (req.query.team_size as string | undefined) ?? (req.query.teamSize as string | undefined);
   const teamSize = teamSizeRaw != null ? Number(teamSizeRaw) : null;
   if (teamSizeRaw != null && (!Number.isInteger(teamSize) || teamSize < 2 || teamSize > 6)) {
     return res.status(400).json({ error: 'team_size must be an integer between 2 and 6' });

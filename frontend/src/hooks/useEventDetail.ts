@@ -9,7 +9,13 @@ export type EventDetail = {
   short_description: string | null;
   long_description: string | null;
   published?: boolean;
+  event_format?: 'challenge' | 'tournament';
+  round_robin_enabled?: boolean;
+  max_teams?: number | null;
+  max_rounds?: number | null;
   allow_late_registration?: boolean;
+  enforce_exact_team_size?: boolean;
+  registration_opens_at?: string | null;
   registration_cutoff?: string | null;
   starts_at: string | null;
   ends_at: string | null;
@@ -68,7 +74,7 @@ export function useEventDetail(slug: string | undefined) {
         if (shouldAuth) {
           try {
             data = await getJsonAuth<EventDetail>(`/events/${encodedSlug}`, token as string);
-          } catch (err) {
+          } catch {
             // If auth fails, fall back to public fetch
             data = await getJson<EventDetail>(`/events/${encodedSlug}`);
           }

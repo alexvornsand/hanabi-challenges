@@ -17,9 +17,13 @@ backend/**/*.d.ts
 backend/**/*.d.ts.map
 backend/tests/**/*.js
 backend/tests/**/*.js.map
+frontend/src/_legacy
 
 # Logs
+var/
 *.log
+!var/logs/
+!var/logs/.gitkeep
 
 # Env files
 .env
@@ -37,3 +41,11 @@ backend/tests/**/*.js.map
 
 # Husky / Git
 pre-commit/node_modules
+
+# Storybook build artifacts
+storybook-static/
+.storybook-cache/
+.cache/storybook/
+
+# Legacy content
+_legacy/*

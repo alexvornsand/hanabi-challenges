@@ -18,7 +18,11 @@ const MAX_NAME_LENGTH = 100;
 const MAX_SHORT_DESC_LENGTH = 500;
 const MAX_DESC_LENGTH = 10000;
 
-function validateLength(field: string, value: string | null | undefined, opts: { min?: number; max?: number }) {
+function validateLength(
+  field: string,
+  value: string | null | undefined,
+  opts: { min?: number; max?: number },
+) {
   if (value == null) return null;
   if (typeof value !== 'string') {
     return `${field} must be a string`;
@@ -37,10 +41,9 @@ function validateLength(field: string, value: string | null | undefined, opts: {
  *  Helper: look up numeric challenge_id from slug
  * ----------------------------------------*/
 async function getChallengeId(slug: string): Promise<number | null> {
-  const result = await pool.query<{ id: number }>(
-    `SELECT id FROM challenges WHERE slug = $1`,
-    [slug]
-  );
+  const result = await pool.query<{ id: number }>(`SELECT id FROM challenges WHERE slug = $1`, [
+    slug,
+  ]);
   return result.rowCount > 0 ? result.rows[0].id : null;
 }
 

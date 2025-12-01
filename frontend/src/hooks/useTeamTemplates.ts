@@ -34,10 +34,15 @@ type State = {
   error: string | null;
 };
 
-export function useTeamTemplates(teamId: number | null | undefined, options?: { enabled?: boolean }) {
+export function useTeamTemplates(
+  teamId: number | null | undefined,
+  options?: { enabled?: boolean },
+) {
   const { token } = useAuth();
   const [state, setState] = useState<State>(() =>
-    teamId == null ? { templates: [], loading: false, error: 'No team specified' } : { templates: [], loading: true, error: null },
+    teamId == null
+      ? { templates: [], loading: false, error: 'No team specified' }
+      : { templates: [], loading: true, error: null },
   );
 
   useEffect(() => {
@@ -51,7 +56,10 @@ export function useTeamTemplates(teamId: number | null | undefined, options?: { 
       setState({ templates: [], loading: true, error: null });
       try {
         const data = token
-          ? await getJsonAuth<{ templates: TeamTemplate[] }>(`/event-teams/${teamId}/templates`, token)
+          ? await getJsonAuth<{ templates: TeamTemplate[] }>(
+              `/event-teams/${teamId}/templates`,
+              token,
+            )
           : await getJson<{ templates: TeamTemplate[] }>(`/event-teams/${teamId}/templates`);
         if (!cancelled) {
           setState({ templates: data.templates, loading: false, error: null });

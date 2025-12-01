@@ -1,8 +1,20 @@
-import { useEffect, useState } from 'react';
-import type { FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ApiError } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
+import {
+  Alert,
+  Button,
+  Card,
+  CardBody,
+  Heading,
+  Input,
+  InputContainer,
+  PageContainer,
+  Section,
+  Stack,
+  Text,
+} from '../design-system';
 
 type LoginResponse = {
   mode: 'created' | 'login';
@@ -83,61 +95,58 @@ export function LoginPage() {
   }
 
   return (
-    <main className="page stack-md" style={{ maxWidth: '480px' }}>
-      <header className="stack-xs">
-        <h1 className="text-2xl font-bold">Log in</h1>
-        <p className="text-gray-700">
-          Enter your username and password. New usernames will create an account automatically.
-        </p>
-      </header>
+    <main>
+      <PageContainer variant="narrow">
+        <Section paddingY="lg">
+          <Stack gap="md">
+            <Stack gap="xs">
+              <Heading level={1}>Log in</Heading>
+              <Text variant="muted">
+                Enter your username and password. New usernames will create an account
+                automatically.
+              </Text>
+            </Stack>
 
-      <form onSubmit={handleSubmit} className="card stack-sm">
-        <div className="stack-xxs">
-          <label className="text-sm font-medium text-gray-700" htmlFor="displayName">
-            Username
-          </label>
-          <input
-            id="displayName"
-            type="text"
-            required
-            value={displayName}
-            onChange={(e) => setDisplayName(e.target.value)}
-            className="input"
-            autoComplete="username"
-          />
-        </div>
+            {error && <Alert variant="error" message={error} />}
 
-        <div className="stack-xxs">
-          <label className="text-sm font-medium text-gray-700" htmlFor="password">
-            Password
-          </label>
-          <input
-            id="password"
-            type="password"
-            required
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="input"
-            autoComplete="current-password"
-          />
-        </div>
+            <Card>
+              <CardBody>
+                <form onSubmit={handleSubmit}>
+                  <Stack gap="sm">
+                    <InputContainer label="Username">
+                      <Input
+                        id="displayName"
+                        type="text"
+                        required
+                        value={displayName}
+                        onChange={(e) => setDisplayName(e.target.value)}
+                        autoComplete="username"
+                        fullWidth
+                      />
+                    </InputContainer>
 
-        <button
-          type="submit"
-          className="btn btn--primary"
-          disabled={loading}
-          style={{ width: '100%' }}
-        >
-          {loading ? 'Logging in...' : 'Log in'}
-        </button>
-      </form>
+                    <InputContainer label="Password">
+                      <Input
+                        id="password"
+                        type="password"
+                        required
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        autoComplete="current-password"
+                        fullWidth
+                      />
+                    </InputContainer>
 
-      {error && (
-        <p className="text-red-600 text-sm" role="alert">
-          {error}
-        </p>
-      )}
-
+                    <Button type="submit" variant="primary" size="md" disabled={loading}>
+                      {loading ? 'Logging in…' : 'Log in'}
+                    </Button>
+                  </Stack>
+                </form>
+              </CardBody>
+            </Card>
+          </Stack>
+        </Section>
+      </PageContainer>
     </main>
   );
 }

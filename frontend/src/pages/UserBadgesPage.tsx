@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { UserPill } from '../components/UserPill';
+import { UserPill } from '../features/users/UserPill';
 import { useAuth } from '../context/AuthContext';
 import { ApiError, getJson } from '../lib/api';
 
@@ -31,8 +31,8 @@ export function UserBadgesPage() {
   const displayName = username ?? 'Unknown';
   const isOwnProfile = Boolean(user && user.display_name === username);
 
-  const pillColor = isOwnProfile ? user?.color_hex ?? '#777777' : '#777777';
-  const pillText = isOwnProfile ? user?.text_color ?? '#ffffff' : '#ffffff';
+  const pillColor = isOwnProfile ? (user?.color_hex ?? '#777777') : '#777777';
+  const pillText = isOwnProfile ? (user?.text_color ?? '#ffffff') : '#ffffff';
   const badgeCopy = isOwnProfile
     ? "You haven't earned any badges yet."
     : `${displayName} hasn't earned any badges yet.`;
@@ -51,7 +51,9 @@ export function UserBadgesPage() {
       setLoading(true);
       setError(null);
       try {
-        const data = await getJson<UserBadge[]>(`/users/${encodeURIComponent(currentUsername)}/badges`);
+        const data = await getJson<UserBadge[]>(
+          `/users/${encodeURIComponent(currentUsername)}/badges`,
+        );
         if (!cancelled) {
           setBadges(data);
         }
@@ -115,11 +117,7 @@ export function UserBadgesPage() {
   return (
     <main className="page stack">
       <div className="flex items-center gap-3">
-        <UserPill
-          name={displayName}
-          color={pillColor}
-          textColor={pillText}
-        />
+        <UserPill name={displayName} color={pillColor} textColor={pillText} />
         <h1 className="text-xl font-semibold">Badges</h1>
       </div>
 
@@ -171,7 +169,7 @@ export function UserBadgesPage() {
                   style={{
                     backgroundColor: 'transparent',
                     color: '#000000',
-                    fontFamily: '\"Material Symbols Outlined\", var(--font-sans)',
+                    fontFamily: '"Material Symbols Outlined", var(--font-sans)',
                     fontSize: '102px',
                     lineHeight: 1,
                   }}
@@ -215,7 +213,12 @@ export function UserBadgesPage() {
             className="card stack-sm"
             onClick={(e) => e.stopPropagation()}
             role="document"
-            style={{ maxWidth: '720px', width: '100%', padding: '16px', boxShadow: 'var(--shadow-hover)' }}
+            style={{
+              maxWidth: '720px',
+              width: '100%',
+              padding: '16px',
+              boxShadow: 'var(--shadow-hover)',
+            }}
           >
             <div style={{ position: 'relative' }}>
               <button
@@ -250,7 +253,7 @@ export function UserBadgesPage() {
                 >
                   <span
                     style={{
-                      fontFamily: '\"Material Symbols Outlined\", var(--font-sans)',
+                      fontFamily: '"Material Symbols Outlined", var(--font-sans)',
                       fontSize: '200px',
                       lineHeight: 1,
                       color: '#000000',
@@ -265,22 +268,32 @@ export function UserBadgesPage() {
                     <h3 className="text-base font-semibold" style={{ margin: 0 }}>
                       {selectedBadge.name}
                     </h3>
-                    <span className="pill text-xs text-gray-700 bg-gray-100">{formatRank(selectedBadge.rank)}</span>
-                    <span className="pill text-xs text-gray-700 bg-gray-100">{selectedBadge.team_size}p</span>
+                    <span className="pill text-xs text-gray-700 bg-gray-100">
+                      {formatRank(selectedBadge.rank)}
+                    </span>
+                    <span className="pill text-xs text-gray-700 bg-gray-100">
+                      {selectedBadge.team_size}p
+                    </span>
                   </div>
                   <p className="text-gray-700 text-sm" style={{ margin: 0 }}>
                     {selectedBadge.description}
                   </p>
                   <div className="text-xs text-gray-600">
                     Event:{' '}
-                    <Link className="text-blue-700 underline" to={`/events/${selectedBadge.event_slug}`}>
+                    <Link
+                      className="text-blue-700 underline"
+                      to={`/events/${selectedBadge.event_slug}`}
+                    >
                       {selectedBadge.event_name}
                     </Link>
                   </div>
                   {selectedBadge.team_name && (
                     <div className="text-xs text-gray-600">
                       Team:{' '}
-                      <Link className="text-blue-700 underline" to={`/events/${selectedBadge.event_slug}/teams/${selectedBadge.team_id}`}>
+                      <Link
+                        className="text-blue-700 underline"
+                        to={`/events/${selectedBadge.event_slug}/teams/${selectedBadge.team_id}`}
+                      >
                         {selectedBadge.team_name}
                       </Link>
                     </div>

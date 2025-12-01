@@ -77,7 +77,12 @@ describe('event.service (integration)', () => {
       VALUES ($1, $2, $3, $4)
       RETURNING id;
       `,
-      ['Template Test Event', 'template-test-event', 'short', 'long description for templates test'],
+      [
+        'Template Test Event',
+        'template-test-event',
+        'short',
+        'long description for templates test',
+      ],
     );
     const eventId = eventRes.rows[0].id as number;
 

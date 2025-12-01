@@ -4,7 +4,7 @@ import { MainLayout } from '../layouts/MainLayout';
 import { LandingPage } from '../pages/LandingPage';
 import { AboutPage } from '../pages/AboutPage';
 import { AboutFAQPage } from '../pages/AboutFAQPage';
-import { EventArchivePage } from '../pages/EventArchivePage';
+import { EventsPage } from '../pages/EventsPage';
 import { EventDetailPage } from '../pages/EventDetailPage';
 import { TeamPage } from '../pages/TeamPage';
 import { LoginPage } from '../pages/LoginPage';
@@ -24,14 +24,14 @@ export function AppRoutes() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<MainLayout />}>
-        {/* Home */}
-        <Route index element={<LandingPage />} />
-        <Route path="about" element={<AboutPage />} />
-        <Route path="about/FAQ" element={<AboutFAQPage />} />
+          {/* Home */}
+          <Route index element={<LandingPage />} />
+          <Route path="about" element={<AboutPage />} />
+          <Route path="about/FAQ" element={<AboutFAQPage />} />
 
           {/* Events */}
           <Route path="events">
-            <Route index element={<EventArchivePage />} />
+            <Route index element={<EventsPage />} />
             <Route path=":slug" element={<EventDetailPage />} />
             <Route path=":slug/:teamSize" element={<EventDetailPage />} />
             <Route path=":slug/teams/:teamId" element={<TeamPage />} />

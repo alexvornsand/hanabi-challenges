@@ -1,12 +1,12 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+'use strict';
+Object.defineProperty(exports, '__esModule', { value: true });
 // backend/vitest.config.ts
-const config_1 = require("vitest/config");
+const config_1 = require('vitest/config');
 exports.default = (0, config_1.defineConfig)({
-    test: {
-        environment: 'node',
-        globals: true,
-        include: ['tests/**/*.{test,spec}.ts'],
-    },
+  test: {
+    environment: 'node',
+    globals: true,
+    include: ['tests/**/*.{test,spec}.ts'],
+  },
 });
 //# sourceMappingURL=vitest.config.js.map

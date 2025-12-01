@@ -100,11 +100,7 @@ export function useTeamDetail(teamId: number | null | undefined) {
         } else if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
           const body = (err.body ?? {}) as Record<string, unknown>;
           const gateMode =
-            err.status === 401
-              ? 'login'
-              : body?.status === 'ENROLLED'
-                ? 'blocked'
-                : 'prompt';
+            err.status === 401 ? 'login' : body?.status === 'ENROLLED' ? 'blocked' : 'prompt';
           const gate: TeamGate = {
             mode: gateMode,
             event_slug: (body.event_slug as string) ?? '',
@@ -147,11 +143,7 @@ export function useTeamDetail(teamId: number | null | undefined) {
       } else if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
         const body = (err.body ?? {}) as Record<string, unknown>;
         const gateMode =
-          err.status === 401
-            ? 'login'
-            : body?.status === 'ENROLLED'
-              ? 'blocked'
-              : 'prompt';
+          err.status === 401 ? 'login' : body?.status === 'ENROLLED' ? 'blocked' : 'prompt';
         const gate: TeamGate = {
           mode: gateMode,
           event_slug: (body.event_slug as string) ?? '',

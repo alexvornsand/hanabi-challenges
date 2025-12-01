@@ -1,9 +1,24 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useUsers } from '../../hooks/useUsers';
 import { postJsonAuth, ApiError } from '../../lib/api';
-import { UserPill } from '../../components/UserPill';
+import { UserPill } from '../../features/users/UserPill';
+import {
+  Alert,
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  Heading,
+  Inline,
+  PageContainer,
+  Pill,
+  Section,
+  Stack,
+  Text,
+  SearchSelect,
+} from '../../design-system';
 
 export function AdminManageUsersPage() {
   const { user, token } = useAuth();
@@ -13,24 +28,16 @@ export function AdminManageUsersPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [highlightIndex, setHighlightIndex] = useState(0);
-  const [showSuggestions, setShowSuggestions] = useState(true);
-
-  if (!user || user.role !== 'SUPERADMIN') {
-    return <Navigate to="/" replace />;
-  }
 
   const suggestions = useMemo(() => {
     const term = search.trim().toLowerCase();
     if (!term) return [];
     return users
+      .filter((u) => u.id !== user?.id)
+      .filter((u) => u.id !== selectedId)
       .filter((u) => u.display_name.toLowerCase().includes(term))
       .slice(0, 7);
-  }, [search, users]);
-
-  useEffect(() => {
-    setHighlightIndex(0);
-  }, [suggestions.length]);
+  }, [search, users, user, selectedId]);
 
   const selectedUser = users.find((u) => u.id === selectedId) ?? null;
 
@@ -53,145 +60,133 @@ export function AdminManageUsersPage() {
     }
   }
 
+  if (!user || user.role !== 'SUPERADMIN') {
+    return <Navigate to="/" replace />;
+  }
+
   return (
-    <main className="page stack-sm">
-      <header className="stack-sm">
-        <h1 className="text-2xl font-bold">Manage Users</h1>
-        <p className="text-gray-700">Promote or demote admins. You cannot change your own role.</p>
-      </header>
+    <main>
+      <PageContainer>
+        <Heading level={1}>Manage users</Heading>
+        <Section paddingY="lg">
+          <Stack gap="md">
+            <Text variant="body">
+              Promote or demote admins. You cannot change your own role. Start typing to find a user
+              and update their role.
+            </Text>
 
-      {error && <p className="text-red-600">{error}</p>}
+            {error && <Alert variant="error" message={error} />}
 
-      <section className="card stack-sm" style={{ maxWidth: '520px' }}>
-        <label className="block text-sm font-medium text-gray-700">Find a user</label>
-        <div className="relative" style={{ position: 'relative' }}>
-          <input
-            className="input w-full"
-            placeholder="Start typing a username"
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setShowSuggestions(true);
-              setSelectedId(null);
-              setMessage(null);
-              setActionError(null);
-            }}
-            onKeyDown={(e) => {
-              if (suggestions.length === 0) return;
-              if (e.key === 'ArrowDown') {
-                e.preventDefault();
-                setHighlightIndex((prev) => (prev + 1) % suggestions.length);
-              } else if (e.key === 'ArrowUp') {
-                e.preventDefault();
-                setHighlightIndex((prev) =>
-                  prev - 1 < 0 ? suggestions.length - 1 : prev - 1
-                );
-              } else if (e.key === 'Tab' || e.key === 'Enter') {
-                const choice = suggestions[highlightIndex];
-                if (choice) {
-                  e.preventDefault();
-                  if (choice.id === user.id) return;
-                  setSelectedId(choice.id);
-                  setSearch(choice.display_name);
-                  setShowSuggestions(false);
-                  setMessage(null);
-                  setActionError(null);
-                }
-              }
-            }}
-            autoComplete="off"
-            style={{ position: 'relative', zIndex: 11 }}
-          />
-          {suggestions.length > 0 && showSuggestions && (
-            <div
-              className="card"
-              style={{
-                position: 'absolute',
-                top: 'calc(100% + 4px)',
-                left: 0,
-                width: '100%',
-                maxWidth: '100%',
-                zIndex: 100,
-                boxSizing: 'border-box',
-                maxHeight: '176px', // fits ~5.5 rows at ~32px each
-                overflowY: 'auto',
-                padding: '6px',
-              }}
-            >
-              <div
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '6px',
-                }}
-              >
-                {suggestions.map((s, idx) => {
-                  const isActive = idx === highlightIndex;
-                  return (
-                    <button
-                      key={s.id}
-                      className="w-full"
-                      style={{
-                        textAlign: 'left',
-                        background: isActive ? 'var(--color-accent-weak)' : 'transparent',
-                        border: 'none',
-                        boxShadow: 'none',
-                        padding: '2px 0',
-                        borderRadius: 'var(--radius-sm)',
-                      }}
-                      onMouseEnter={() => setHighlightIndex(idx)}
-                      onClick={() => {
-                        if (s.id === user.id) return;
-                        setSelectedId(s.id);
-                        setSearch(s.display_name);
-                        setShowSuggestions(false);
-                        setMessage(null);
-                        setActionError(null);
-                      }}
-                    >
-                      <UserPill
-                        name={s.display_name}
-                        color={s.color_hex || '#777777'}
-                        textColor={s.text_color || '#ffffff'}
-                      />
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-        </div>
+            <Card variant="outline">
+              <CardHeader>
+                <Heading level={3}>Find a user</Heading>
+              </CardHeader>
+              <CardBody>
+                <Stack gap="sm">
+                  <SearchSelect
+                    value={search}
+                    onChange={(next) => {
+                      setSearch(next);
+                      setSelectedId(null);
+                      setMessage(null);
+                      setActionError(null);
+                    }}
+                    suggestions={suggestions.map((s) => ({
+                      key: s.id,
+                      value: s,
+                      node: (
+                        <UserPill
+                          name={s.display_name}
+                          color={s.color_hex || '#777777'}
+                          textColor={s.text_color || '#ffffff'}
+                        />
+                      ),
+                    }))}
+                    onSelect={(s) => {
+                      if (s.id === user.id) return;
+                      setSelectedId(s.id);
+                      setSearch('');
+                      setMessage(null);
+                      setActionError(null);
+                    }}
+                    placeholder="Start typing a username"
+                    maxSelections={1}
+                    selectedCount={selectedId ? 1 : 0}
+                    tokens={
+                      selectedUser
+                        ? [
+                            <button
+                              type="button"
+                              key={selectedUser.id}
+                              className="ds-search-select__token ds-search-select__token-button"
+                              onClick={() => {
+                                setSelectedId(null);
+                                setSearch('');
+                                setMessage(null);
+                                setActionError(null);
+                              }}
+                              title="Remove selection"
+                            >
+                              <UserPill
+                                name={selectedUser.display_name}
+                                color={selectedUser.color_hex || '#777777'}
+                                textColor={selectedUser.text_color || '#ffffff'}
+                                hoverIcon={
+                                  <span className="material-symbols-outlined" aria-hidden="true">
+                                    &#xe5c9;
+                                  </span>
+                                }
+                              />
+                            </button>,
+                          ]
+                        : []
+                    }
+                  />
 
-        {selectedUser ? (
-          <div className="card stack-sm" style={{ background: 'var(--color-surface-muted)' }}>
-            <div className="flex items-center gap-2">
-              <UserPill
-                name={selectedUser.display_name}
-                color={selectedUser.color_hex || '#777777'}
-                textColor={selectedUser.text_color || '#ffffff'}
-              />
-              <span className="pill text-xs" style={{ marginLeft: '4px' }}>
-                {selectedUser.role}
-              </span>
-            </div>
-            <div className="flex gap-2">
-              <button
-                className="btn btn--primary btn--sm"
-                disabled={saving || selectedUser.id === user.id}
-                onClick={() =>
-                  handleRoleChange(selectedUser.role === 'ADMIN' ? 'USER' : 'ADMIN')
-                }
-              >
-                {selectedUser.role === 'ADMIN' ? 'Demote to User' : 'Promote to Admin'}
-              </button>
-            </div>
-            {message && <p className="text-green-700 text-sm">{message}</p>}
-            {actionError && <p className="text-red-600 text-sm">{actionError}</p>}
-          </div>
-        ) : (
-          <p className="text-sm text-gray-600">Search and select a user to manage their role.</p>
-        )}
-      </section>
+                  {selectedUser ? (
+                    <Card variant="outline" separated>
+                      <CardBody>
+                        <Stack gap="sm">
+                          <Inline gap="sm" align="center">
+                            <UserPill
+                              name={selectedUser.display_name}
+                              color={selectedUser.color_hex || '#777777'}
+                              textColor={selectedUser.text_color || '#ffffff'}
+                            />
+                            <Pill size="sm" variant="accent">
+                              {selectedUser.role}
+                            </Pill>
+                          </Inline>
+                          <Inline gap="sm">
+                            <Button
+                              variant="primary"
+                              size="md"
+                              disabled={saving || selectedUser.id === user.id}
+                              onClick={() =>
+                                handleRoleChange(selectedUser.role === 'ADMIN' ? 'USER' : 'ADMIN')
+                              }
+                            >
+                              {selectedUser.role === 'ADMIN'
+                                ? 'Demote to User'
+                                : 'Promote to Admin'}
+                            </Button>
+                          </Inline>
+                          {message && <Alert variant="success" message={message} />}
+                          {actionError && <Alert variant="error" message={actionError} />}
+                        </Stack>
+                      </CardBody>
+                    </Card>
+                  ) : (
+                    <Text variant="muted">
+                      Search and select a user to manage their role. You cannot change your own.
+                    </Text>
+                  )}
+                </Stack>
+              </CardBody>
+            </Card>
+          </Stack>
+        </Section>
+      </PageContainer>
     </main>
   );
 }

@@ -1,7 +1,10 @@
+/// <reference types="vitest/config" />
 // https://vite.dev/config/
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
+// If you want to configure Vitest later, you can do it in the `test` block below.
+// For now this is a minimal, Storybook-agnostic config.
 export default defineConfig({
   plugins: [react()],
   server: {
@@ -13,5 +16,10 @@ export default defineConfig({
         rewrite: (path) => path.replace(/^\/api/, '/api'),
       },
     },
+  },
+  test: {
+    // Basic Vitest config; tweak or remove if you're not using Vitest yet
+    environment: 'jsdom',
+    globals: true,
   },
 });

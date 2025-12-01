@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ApiError, getJson } from '../lib/api';
-import { UserPill } from '../components/UserPill';
 import { useAuth } from '../context/AuthContext';
 
 type UserProfile = {
@@ -75,10 +74,7 @@ export function UserProfilePage() {
       {error || !user ? (
         <div className="card stack-sm">
           <p className="text-red-600">{error ?? 'User not found'}</p>
-          <button
-            onClick={() => navigate('/')}
-            className="btn btn--primary"
-          >
+          <button onClick={() => navigate('/')} className="btn btn--primary">
             Go home
           </button>
         </div>

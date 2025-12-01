@@ -1,81 +1,102 @@
-import React from 'react';
-import { Outlet, Link } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { Button, Inline, PageContainer, Tabs, Text } from '../design-system';
+import { UserPill } from '../features/users/UserPill';
+import './MainLayout.css';
 
 export const MainLayout: React.FC = () => {
   const { user, logout } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains('dark'));
+
+  useEffect(() => {
+    const root = document.documentElement;
+    root.classList.toggle('dark', isDark);
+    root.setAttribute('data-theme', isDark ? 'dark' : 'light');
+    document.body.classList.toggle('dark', isDark);
+  }, [isDark]);
+
+  const links = [
+    { to: '/', label: 'Home', end: true },
+    { to: '/events', label: 'Events' },
+    { to: '/about', label: 'About' },
+    {
+      to: '/admin',
+      label: 'Admin',
+      show: !!user && (user.role === 'ADMIN' || user.role === 'SUPERADMIN'),
+    },
+  ];
 
   return (
-    <div
-      className="app-root"
-      style={{ background: 'linear-gradient(180deg, #f8fbff 0%, #ffffff 45%, #f6f8fb 100%)' }}
-    >
-      <header style={{ background: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)' }}>
-        <nav
-          className="main-nav"
-          style={{
-            maxWidth: '1100px',
-            margin: '0 auto',
-            padding: '12px 16px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '12px',
-          }}
-        >
-          <div
-            className="main-nav__links"
-            style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}
-          >
-            <Link to="/">Home</Link>
-            <Link to="/events">Events</Link>
-            <Link to="/about">About</Link>
-            {user && (user.role === 'ADMIN' || user.role === 'SUPERADMIN') && <Link to="/admin">Admin</Link>}
-          </div>
-          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            {user ? (
-              <>
-                <Link
-                  to="/me"
-                  className="main-nav__login-btn main-nav__login-btn--user"
-                  style={{
-                    backgroundColor: user.color_hex || '#777777',
-                    color: user.text_color || '#ffffff',
-                    borderColor: user.color_hex || '#777777',
-                  }}
+    <div className="app-root">
+      <header className="main-layout__header">
+        <PageContainer>
+          <div className="main-layout__nav">
+            <Inline gap="sm" justify="space-between" align="center" wrap style={{ width: '100%' }}>
+              <Tabs
+                items={links
+                  .filter((l) => l.show ?? true)
+                  .map((link) => ({
+                    key: link.to,
+                    label: link.label,
+                    active: link.end
+                      ? location.pathname === link.to
+                      : location.pathname.startsWith(link.to),
+                    onSelect: () => navigate(link.to),
+                  }))}
+              />
+              <Inline className="main-layout__actions" gap="sm" align="center" justify="end">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsDark((v) => !v)}
+                  aria-label="Toggle theme"
                 >
-                  {user.display_name}
-                </Link>
-                <button
-                  className="btn btn--secondary"
-                  onClick={() => logout()}
-                  style={{ padding: '6px 10px' }}
-                >
-                  Log out
-                </button>
-              </>
-            ) : (
-              <Link to="/login" className="main-nav__login-btn">
-                Log in
-              </Link>
-            )}
+                  <span className="material-symbols-outlined" aria-hidden="true">
+                    {'\uEB37'}
+                  </span>
+                </Button>
+
+                {user ? (
+                  <>
+                    <UserPill
+                      as={Link}
+                      to="/me"
+                      name={user.display_name}
+                      color={user.color_hex}
+                      textColor={user.text_color}
+                      size="md"
+                      className="main-layout__user-pill"
+                    />
+                    <Button variant="secondary" size="md" onClick={() => logout()}>
+                      Log out
+                    </Button>
+                  </>
+                ) : (
+                  <Button as={Link} to="/login" variant="primary" size="md">
+                    Log in
+                  </Button>
+                )}
+              </Inline>
+            </Inline>
           </div>
-        </nav>
+        </PageContainer>
       </header>
 
-      <main style={{ maxWidth: '1100px', margin: '0 auto', padding: '24px 16px' }}>
-        <Outlet />
+      <main className="main-layout__main">
+        <PageContainer>
+          <Outlet />
+        </PageContainer>
       </main>
 
-      <footer
-        style={{
-          background: 'var(--color-surface)',
-          borderTop: '1px solid var(--color-border)',
-          marginTop: 'var(--space-md)',
-        }}
-      >
-        <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '12px 16px' }}>
-          <small className="text-gray-700">© {new Date().getFullYear()} Hanabi Events</small>
-        </div>
+      <footer className="main-layout__footer">
+        <PageContainer>
+          <Text variant="muted" className="main-layout__footnote">
+            © {new Date().getFullYear()} Hanabi Events
+          </Text>
+        </PageContainer>
       </footer>
     </div>
   );

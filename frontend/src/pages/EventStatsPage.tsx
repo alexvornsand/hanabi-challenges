@@ -36,12 +36,66 @@ export function EventStatsPage() {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
-  const [gateMode, setGateMode] = useState<'loading' | 'allow' | 'login' | 'blocked' | 'prompt' | 'error'>('loading');
+  const [gateMode, setGateMode] = useState<
+    'loading' | 'allow' | 'login' | 'blocked' | 'prompt' | 'error'
+  >('loading');
   const [gateError, setGateError] = useState<string | null>(null);
   const [forfeitLoading, setForfeitLoading] = useState(false);
+  const [eventMeta, setEventMeta] = useState<{
+    allow_late_registration?: boolean;
+    registration_cutoff?: string | null;
+    ends_at?: string | null;
+    published?: boolean;
+  } | null>(null);
+
+  // Fetch minimal event metadata so we can determine if the event is closed (no spoiler risk).
+  useEffect(() => {
+    if (!slug) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const meta = await getJson<{
+          allow_late_registration?: boolean;
+          registration_cutoff?: string | null;
+          ends_at?: string | null;
+          published?: boolean;
+        }>(`/events/${encodeURIComponent(slug)}`);
+        if (!cancelled) setEventMeta(meta);
+      } catch (err) {
+        if (!cancelled) {
+          console.error('Failed to load event metadata for stats gate', err);
+          setEventMeta({});
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [slug]);
 
   useEffect(() => {
     if (!slug) return;
+
+    // Wait until we know the event metadata before deciding gate mode.
+    if (eventMeta === null) {
+      setGateMode('loading');
+      return;
+    }
+
+    // If the event has ended or registration is closed (and late registration is not allowed),
+    // allow stats to be viewed without login since there is no spoiler risk.
+    const now = Date.now();
+    const endedAt = eventMeta?.ends_at ? new Date(eventMeta.ends_at).getTime() : null;
+    const cutoff = eventMeta?.registration_cutoff
+      ? new Date(eventMeta.registration_cutoff).getTime()
+      : endedAt;
+    const registrationClosed =
+      cutoff != null && !eventMeta?.allow_late_registration && cutoff < now;
+    if ((endedAt && endedAt < now) || registrationClosed) {
+      setGateMode('allow');
+      return;
+    }
+
     if (!user || !token) {
       setGateMode('login');
       return;
@@ -67,7 +121,8 @@ export function EventStatsPage() {
         const missingSizes = [2, 3, 4, 5, 6].filter(
           (size) => !entries.some((e) => Number(e.team_size) === size),
         );
-        const allAllowed = entries.length > 0 && entries.every((e) => allowedStatuses.includes(e.status));
+        const allAllowed =
+          entries.length > 0 && entries.every((e) => allowedStatuses.includes(e.status));
         if (missingSizes.length === 0 && allAllowed) {
           setGateMode('allow');
         } else {
@@ -89,7 +144,7 @@ export function EventStatsPage() {
     return () => {
       cancelled = true;
     };
-  }, [slug, token, user]);
+  }, [slug, token, user, eventMeta]);
 
   useEffect(() => {
     if (!slug || gateMode !== 'allow') return;
@@ -127,17 +182,13 @@ export function EventStatsPage() {
 
     const x = d3
       .scaleBand<string>()
-      .domain(chartData.map((d) => (d.seed_payload || `Seed ${d.template_index}`)))
+      .domain(chartData.map((d) => d.seed_payload || `Seed ${d.template_index}`))
       .range([0, innerWidth])
       .padding(0.35);
 
     const values = chartData.map((d) => (d[measure] ?? 0) as number);
     const maxY = Math.max(1, d3.max(values) ?? 1);
-    const y = d3
-      .scaleLinear()
-      .domain([0, maxY])
-      .nice()
-      .range([innerHeight, 0]);
+    const y = d3.scaleLinear().domain([0, maxY]).nice().range([innerHeight, 0]);
 
     const color = d3.scaleOrdinal<string>().domain(['dot']).range(['#2563eb']);
 
@@ -150,7 +201,9 @@ export function EventStatsPage() {
     const yAxis = d3
       .axisLeft(y)
       .ticks(6)
-      .tickFormat((v) => (measure === 'avg_win_rate' ? `${Math.round(Number(v) * 100)}%` : String(v)));
+      .tickFormat((v) =>
+        measure === 'avg_win_rate' ? `${Math.round(Number(v) * 100)}%` : String(v),
+      );
 
     g.append('g')
       .attr('transform', `translate(0,${innerHeight})`)
@@ -167,10 +220,10 @@ export function EventStatsPage() {
       .selectAll('circle')
       .data(chartData)
       .join('circle')
-      .attr('cx', (d) => (x(d.seed_payload || `Seed ${d.template_index}`) ?? 0) + (x.bandwidth() / 2))
+      .attr('cx', (d) => (x(d.seed_payload || `Seed ${d.template_index}`) ?? 0) + x.bandwidth() / 2)
       .attr('cy', (d) => y((d[measure] ?? 0) as number))
       .attr('r', 7)
-      .attr('fill', (d) => color('dot'))
+      .attr('fill', () => color('dot'))
       .attr('opacity', 0.85);
 
     g.append('text')

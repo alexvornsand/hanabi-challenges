@@ -37,12 +37,7 @@ describe('result.service (games, integration)', () => {
       VALUES ($1, $2, $3, $4)
       RETURNING id;
       `,
-      [
-        'Result Test Event',
-        'result-test-event',
-        'short desc',
-        'long description for result tests',
-      ],
+      ['Result Test Event', 'result-test-event', 'short desc', 'long description for result tests'],
     );
     const eventId = eventRes.rows[0].id as number;
 

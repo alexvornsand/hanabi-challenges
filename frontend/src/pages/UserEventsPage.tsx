@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { UserPill } from '../components/UserPill';
+import { UserPill } from '../features/users/UserPill';
 import { useAuth } from '../context/AuthContext';
 import { ApiError, getJson } from '../lib/api';
 
@@ -40,7 +40,9 @@ export function UserEventsPage() {
       setLoading(true);
       setError(null);
       try {
-        const data = await getJson<UserEvent[]>(`/users/${encodeURIComponent(currentUsername)}/events`);
+        const data = await getJson<UserEvent[]>(
+          `/users/${encodeURIComponent(currentUsername)}/events`,
+        );
         if (!cancelled) {
           setEvents(data);
         }
@@ -69,8 +71,16 @@ export function UserEventsPage() {
         <h1 className="text-xl font-semibold">Events</h1>
       </div>
 
-      {loading && <div className="card"><p>Loading events...</p></div>}
-      {error && <div className="card"><p className="text-red-600">{error}</p></div>}
+      {loading && (
+        <div className="card">
+          <p>Loading events...</p>
+        </div>
+      )}
+      {error && (
+        <div className="card">
+          <p className="text-red-600">{error}</p>
+        </div>
+      )}
 
       {!loading && !error && events.length === 0 && (
         <div className="card">
@@ -81,7 +91,11 @@ export function UserEventsPage() {
       {!loading && !error && events.length > 0 && (
         <div className="grid md:grid-cols-2 gap-3">
           {events.map((ev) => (
-            <div key={ev.event_team_id} className="card stack-xxs" style={{ marginBottom: 'var(--space-sm)' }}>
+            <div
+              key={ev.event_team_id}
+              className="card stack-xxs"
+              style={{ marginBottom: 'var(--space-sm)' }}
+            >
               <h2 style={{ margin: 0, lineHeight: 1.3 }}>
                 <Link
                   to={`/events/${ev.event_slug}`}

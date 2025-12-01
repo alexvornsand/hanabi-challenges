@@ -1,0 +1,4 @@
+.ds-subsection {
+  padding-top: var(--ds-space-sm);
+  padding-bottom: var(--ds-space-sm);
+}

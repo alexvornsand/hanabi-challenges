@@ -16,7 +16,12 @@ export interface Event {
   short_description: string | null;
   long_description: string;
   published: boolean;
+  event_format: 'challenge' | 'tournament';
+  round_robin_enabled: boolean;
+  max_teams: number | null;
+  max_rounds: number | null;
   allow_late_registration: boolean;
+  registration_opens_at: string | null;
   registration_cutoff: string | null;
   starts_at: string | null;
   ends_at: string | null;
@@ -59,7 +64,12 @@ export interface EventDetail {
   short_description: string | null;
   long_description: string;
   published: boolean;
+  event_format: 'challenge' | 'tournament';
+  round_robin_enabled: boolean;
+  max_teams: number | null;
+  max_rounds: number | null;
   allow_late_registration: boolean;
+  registration_opens_at: string | null;
   registration_cutoff: string | null;
   starts_at: string | null;
   ends_at: string | null;
@@ -71,7 +81,12 @@ export interface CreateEventInput {
   short_description?: string | null;
   long_description: string;
   published?: boolean;
+  event_format?: 'challenge' | 'tournament';
+  round_robin_enabled?: boolean;
+  max_teams?: number | null;
+  max_rounds?: number | null;
   allow_late_registration?: boolean;
+  registration_opens_at?: string | null;
   registration_cutoff?: string | null;
   starts_at?: string | null;
   ends_at?: string | null;
@@ -83,7 +98,12 @@ export interface UpdateEventInput {
   short_description?: string | null;
   long_description?: string;
   published?: boolean;
+  event_format?: 'challenge' | 'tournament';
+  round_robin_enabled?: boolean;
+  max_teams?: number | null;
+  max_rounds?: number | null;
   allow_late_registration?: boolean;
+  registration_opens_at?: string | null;
   registration_cutoff?: string | null;
   starts_at?: string | null;
   ends_at?: string | null;
@@ -105,7 +125,12 @@ export async function listEvents(options: { includeUnpublished?: boolean } = {})
       short_description,
       long_description,
       published,
+      event_format,
+      round_robin_enabled,
+      max_teams,
+      max_rounds,
       allow_late_registration,
+      registration_opens_at,
       registration_cutoff,
       starts_at,
       ends_at
@@ -130,7 +155,12 @@ export async function createEvent(input: CreateEventInput) {
     starts_at,
     ends_at,
     published,
+    event_format = 'challenge',
+    round_robin_enabled = false,
+    max_teams = null,
+    max_rounds = null,
     allow_late_registration,
+    registration_opens_at,
     registration_cutoff,
   } = input;
 
@@ -150,13 +180,18 @@ export async function createEvent(input: CreateEventInput) {
         short_description,
         long_description,
         published,
+        event_format,
+        round_robin_enabled,
+        max_teams,
+        max_rounds,
         allow_late_registration,
+        registration_opens_at,
         registration_cutoff,
         starts_at,
         ends_at
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-      RETURNING id, name, slug, short_description, long_description, published, allow_late_registration, registration_cutoff, starts_at, ends_at, created_at;
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+      RETURNING id, name, slug, short_description, long_description, published, event_format, round_robin_enabled, max_teams, max_rounds, allow_late_registration, registration_opens_at, registration_cutoff, starts_at, ends_at, created_at;
       `,
       [
         name,
@@ -164,10 +199,15 @@ export async function createEvent(input: CreateEventInput) {
         short_description ?? null,
         long_description,
         published ?? false,
+        event_format,
+        round_robin_enabled,
+        max_teams,
+        max_rounds,
         allow_late_registration ?? true,
+        registration_opens_at ?? null,
         registration_cutoff ?? null,
-        starts_at,
-        ends_at,
+        starts_at ?? null,
+        ends_at ?? null,
       ],
     );
 
@@ -198,10 +238,27 @@ export async function updateEventBySlug(slug: string, input: UpdateEventInput) {
       input.short_description !== undefined ? input.short_description : existing.short_description,
     long_description: input.long_description ?? existing.long_description,
     published: input.published ?? existing.published,
+    event_format: input.event_format ?? (existing as EventDetail).event_format ?? 'challenge',
+    round_robin_enabled:
+      input.round_robin_enabled !== undefined
+        ? input.round_robin_enabled
+        : ((existing as EventDetail).round_robin_enabled ?? false),
+    max_teams:
+      input.max_teams !== undefined
+        ? input.max_teams
+        : ((existing as EventDetail).max_teams ?? null),
+    max_rounds:
+      input.max_rounds !== undefined
+        ? input.max_rounds
+        : ((existing as EventDetail).max_rounds ?? null),
     allow_late_registration:
       input.allow_late_registration !== undefined
         ? input.allow_late_registration
         : existing.allow_late_registration,
+    registration_opens_at:
+      input.registration_opens_at !== undefined
+        ? input.registration_opens_at
+        : ((existing as EventDetail).registration_opens_at ?? null),
     registration_cutoff:
       input.registration_cutoff !== undefined
         ? input.registration_cutoff
@@ -219,12 +276,17 @@ export async function updateEventBySlug(slug: string, input: UpdateEventInput) {
       short_description = $3,
       long_description = $4,
       published = $5,
-      allow_late_registration = $6,
-      registration_cutoff = $7,
-      starts_at = $8,
-      ends_at = $9
-    WHERE slug = $10
-    RETURNING id, slug, name, short_description, long_description, published, allow_late_registration, registration_cutoff, starts_at, ends_at;
+      event_format = $6,
+      round_robin_enabled = $7,
+      max_teams = $8,
+      max_rounds = $9,
+      allow_late_registration = $10,
+      registration_opens_at = $11,
+      registration_cutoff = $12,
+      starts_at = $13,
+      ends_at = $14
+    WHERE slug = $15
+    RETURNING id, slug, name, short_description, long_description, published, event_format, round_robin_enabled, max_teams, max_rounds, allow_late_registration, registration_opens_at, registration_cutoff, starts_at, ends_at;
     `,
     [
       next.name,
@@ -232,7 +294,12 @@ export async function updateEventBySlug(slug: string, input: UpdateEventInput) {
       next.short_description,
       next.long_description,
       next.published,
+      next.event_format,
+      next.round_robin_enabled,
+      next.max_teams,
+      next.max_rounds,
       next.allow_late_registration,
+      next.registration_opens_at,
       next.registration_cutoff,
       next.starts_at,
       next.ends_at,
@@ -261,7 +328,12 @@ export async function getEventBySlug(
       short_description,
       long_description,
       published,
+      event_format,
+      round_robin_enabled,
+      max_teams,
+      max_rounds,
       allow_late_registration,
+      registration_opens_at,
       registration_cutoff,
       starts_at,
       ends_at
@@ -358,7 +430,9 @@ export async function createEventGameTemplate(
     const pgErr = err as { code?: string };
 
     if (pgErr.code === '23505') {
-      throw new EventGameTemplateExistsError('Template already exists for this stage with that index');
+      throw new EventGameTemplateExistsError(
+        'Template already exists for this stage with that index',
+      );
     }
     throw err;
   }

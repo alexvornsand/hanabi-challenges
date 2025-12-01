@@ -16,7 +16,9 @@ type State = {
 
 export function useEventMemberships(slug: string | undefined) {
   const [state, setState] = useState<State>(() =>
-    !slug ? { memberships: [], loading: false, error: 'No event specified' } : { memberships: [], loading: true, error: null },
+    !slug
+      ? { memberships: [], loading: false, error: 'No event specified' }
+      : { memberships: [], loading: true, error: null },
   );
 
   useEffect(() => {
@@ -26,7 +28,9 @@ export function useEventMemberships(slug: string | undefined) {
     async function fetchMemberships(currentSlug: string) {
       setState({ memberships: [], loading: true, error: null });
       try {
-        const data = await getJson<EventMembership[]>(`/events/${encodeURIComponent(currentSlug)}/memberships`);
+        const data = await getJson<EventMembership[]>(
+          `/events/${encodeURIComponent(currentSlug)}/memberships`,
+        );
         if (!cancelled) {
           setState({ memberships: data, loading: false, error: null });
         }
