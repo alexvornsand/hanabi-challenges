@@ -25,6 +25,8 @@ export const sections = pgTable('sections', {
   classificationRule: text('classification_rule'), // nullable
   unitAttribution: text('unit_attribution'), // nullable: 'share' | 'split'
   config: jsonb('config').notNull().default('{}'), // raw user-authored YAML
+  captureMode: text('capture_mode').notNull().default('both'), // 'scrape_only' | 'submit_only' | 'both'
+  registrationMode: text('registration_mode').notNull().default('implicit'), // 'implicit' | 'explicit'
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
