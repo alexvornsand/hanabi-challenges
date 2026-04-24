@@ -1,6 +1,7 @@
 import { db } from '../index.js';
 import { colourTokenRegistry } from '../schema.js';
 import { COLOUR_TOKENS } from './colourTokens.js';
+import { seedVariants } from './variants.js';
 
 async function seed() {
   console.log('Seeding colour tokens...');
@@ -16,6 +17,8 @@ async function seed() {
     )
     .onConflictDoNothing();
   console.log(`Inserted ${COLOUR_TOKENS.length} colour tokens (idempotent).`);
+
+  await seedVariants(db);
   process.exit(0);
 }
 
