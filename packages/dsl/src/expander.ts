@@ -357,6 +357,7 @@ function expandSection(
 
   return {
     name: interpolated.name ?? 'Unnamed',
+    slug: interpolated.slug,
     position,
     section_type,
     scoring_unit_type: (interpolated.scoring_unit_type ?? 'individual') as 'individual' | 'team' | 'inferred',
