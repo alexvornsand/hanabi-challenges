@@ -20,7 +20,8 @@
     "drizzle-orm": "^0.30.0",
     "postgres": "^3.4.0",
     "node-cron": "^3.0.3",
-    "@hanabi/dsl": "workspace:*"
+    "@hanabi/dsl": "workspace:*",
+    "zod": "^3.22.0"
   },
   "devDependencies": {
     "drizzle-kit": "^0.20.0",
