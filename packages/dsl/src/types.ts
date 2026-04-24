@@ -361,6 +361,11 @@ export interface ExpandedSection {
   sections: ExpandedSection[];
   slots: SlotSource[];
   deferred_slot_count?: DeferredSlotCount;
+  // root-only fields — present on root section, error if on child sections
+  organisers?: string[];
+  dimensions?: Dimension[];
+  absence_policy?: AbsencePolicy;
+  promotion_relegation?: PromotionRelegation;
 }
 
 export interface ExpandedConfig {

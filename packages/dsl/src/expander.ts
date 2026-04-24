@@ -376,6 +376,10 @@ function expandSection(
     routing: interpolated.routing as RoutingBlock | undefined,
     sections: expandedSections,
     slots,
+    ...(interpolated.organisers ? { organisers: interpolated.organisers } : {}),
+    ...(interpolated.dimensions ? { dimensions: interpolated.dimensions } : {}),
+    ...(interpolated.absence_policy ? { absence_policy: interpolated.absence_policy } : {}),
+    ...(interpolated.promotion_relegation ? { promotion_relegation: interpolated.promotion_relegation } : {}),
   };
 }
 
