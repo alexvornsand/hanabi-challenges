@@ -334,6 +334,11 @@ export interface DeferredSlotGenerator {
 }
 export type SlotSource = ExpandedSlot | DeferredSlotGenerator;
 
+export interface DeferredSlotCount {
+  kind: 'deferred_count';
+  expr: string;
+}
+
 export interface ExpandedSection {
   name: string;
   position: number;
@@ -355,6 +360,7 @@ export interface ExpandedSection {
   routing?: RoutingBlock;
   sections: ExpandedSection[];
   slots: SlotSource[];
+  deferred_slot_count?: DeferredSlotCount;
 }
 
 export interface ExpandedConfig {
