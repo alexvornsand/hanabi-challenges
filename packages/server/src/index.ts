@@ -1,18 +1,59 @@
 import Fastify from 'fastify';
+import cors from '@fastify/cors';
+import cookie from '@fastify/cookie';
+import session from '@fastify/session';
+import { config } from './config.js';
+import { eventsRoutes } from './routes/events.js';
+import { adminRoutes } from './routes/admin.js';
+import { publicRoutes } from './routes/public.js';
+import { authRoutes } from './routes/auth.js';
+import { registrationsRoutes } from './routes/registrations.js';
+import { teamsRoutes } from './routes/teams.js';
 
-const fastify = Fastify({ logger: true });
+export async function buildServer() {
+  const fastify = Fastify({
+    logger: config.NODE_ENV !== 'test',
+  });
 
-fastify.get('/health', async () => {
-  return { status: 'ok' };
-});
+  // CORS
+  await fastify.register(cors, {
+    origin: config.CORS_ORIGIN,
+    credentials: true,
+  });
 
-const start = async () => {
+  // Cookies + session
+  await fastify.register(cookie);
+  await fastify.register(session, {
+    secret: config.SESSION_SECRET,
+    cookie: {
+      secure: config.NODE_ENV === 'production',
+      httpOnly: true,
+      sameSite: 'lax',
+    },
+  });
+
+  // Health check
+  fastify.get('/health', async () => ({ status: 'ok' }));
+
+  // Routes
+  await fastify.register(eventsRoutes);
+  await fastify.register(adminRoutes);
+  await fastify.register(publicRoutes);
+  await fastify.register(authRoutes);
+  await fastify.register(registrationsRoutes);
+  await fastify.register(teamsRoutes);
+
+  return fastify;
+}
+
+// Start server only when executed directly
+const isMain = process.argv[1]?.endsWith('index.ts') || process.argv[1]?.endsWith('index.js');
+if (isMain) {
+  const server = await buildServer();
   try {
-    await fastify.listen({ port: 3001, host: '0.0.0.0' });
+    await server.listen({ port: config.PORT, host: '0.0.0.0' });
   } catch (err) {
-    fastify.log.error(err);
+    server.log.error(err);
     process.exit(1);
   }
-};
-
-start();
+}
