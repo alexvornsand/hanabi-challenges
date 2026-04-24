@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "main": "./src/index.ts",
-  "scripts": { "test": "vitest run" },
+  "scripts": { "build": "tsc --noEmit", "test": "vitest run" },
   "dependencies": { "yaml": "^2.4.0", "zod": "^3.22.0" },
   "devDependencies": { "vitest": "^1.4.0", "typescript": "^5.4.0" }
 }
