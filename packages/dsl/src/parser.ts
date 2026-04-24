@@ -340,8 +340,8 @@ const rawSectionSchema: z.ZodType<RawSectionInput> = z.lazy(() =>
     scoreboards: z.array(scoreboardSchema).optional(),
     conditional_activation: z.string().optional(),
     routing: z.record(z.unknown()).optional(),
-    sections: z.array(z.union([z.lazy(() => rawSectionSchema), generatorCallSchema])).optional(),
-    slots: z.array(z.union([slotConfigSchema, generatorCallSchema])).optional(),
+    sections: z.array(z.union([generatorCallSchema, z.lazy(() => rawSectionSchema)])).optional(),
+    slots: z.array(z.union([generatorCallSchema, slotConfigSchema])).optional(),
     // Legacy keys that should produce errors
     slots_per_match: z.undefined(),
   }),
