@@ -24,6 +24,8 @@ import type {
 } from './types.js';
 import { interpolate } from './compileTimeEval.js';
 import type { CompileTimeEnv } from './compileTimeEval.js';
+import { singleElimination, doubleElimination, stepladder, roundRobin } from './generators/brackets.js';
+import type { BracketParams, RoundRobinParams } from './generators/brackets.js';
 
 const diagnostics: Diagnostic[] = [];
 
@@ -256,6 +258,43 @@ function expandSlots(
 }
 
 // ---------------------------------------------------------------------------
+// Bracket generator dispatch
+// ---------------------------------------------------------------------------
+
+function expandBracketGenerator(
+  genName: string,
+  genArgs: Record<string, unknown>,
+): ExpandedSection[] | null {
+  const unitCount = (genArgs.unit_count as number | undefined) ?? 8;
+  const params: BracketParams = {
+    match_comparators: (genArgs.match_comparators as BracketParams['match_comparators']) ?? [],
+    slots: (genArgs.slots as number | string | undefined) ?? 1,
+    assignment: (genArgs.assignment as BracketParams['assignment']) ?? 'dynamic',
+  };
+
+  switch (genName) {
+    case 'single_elimination':
+      return singleElimination(params, unitCount);
+    case 'double_elimination':
+      return doubleElimination(params, unitCount);
+    case 'stepladder':
+      return stepladder(params, unitCount);
+    case 'round_robin': {
+      const rrParams: RoundRobinParams = {
+        ...params,
+        win_points: genArgs.win_points as number | undefined,
+        draw_points: genArgs.draw_points as number | undefined,
+        loss_points: genArgs.loss_points as number | undefined,
+        tiebreakers: genArgs.tiebreakers as string[] | undefined,
+      };
+      return roundRobin(rrParams, unitCount);
+    }
+    default:
+      return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Expand a single section recursively
 // ---------------------------------------------------------------------------
 
@@ -280,7 +319,17 @@ function expandSection(
     let childPos = 0;
     for (const child of interpolated.sections) {
       if (isGeneratorCall(child)) {
-        // Generator calls on sections are simplified: skip for now
+        const genName = (child as Record<string, unknown>).generator as string;
+        const genArgs = { ...(child as Record<string, unknown>) };
+        delete genArgs.generator;
+
+        const bracketSections = expandBracketGenerator(genName, genArgs);
+        if (bracketSections) {
+          for (const bs of bracketSections) {
+            expandedSections.push({ ...bs, position: childPos++ });
+          }
+        }
+        // Unknown section generators are silently skipped
         continue;
       }
       expandedSections.push(
