@@ -305,7 +305,7 @@ const slotConfigSchema = z.object({
   attempt_modifier: attemptModifierSchema.optional(),
   validity_rules: z.array(validityRuleSchema).optional(),
   time_window: timeWindowSchema.optional(),
-});
+}).passthrough();
 
 const generatorCallSchema = z.object({ generator: z.string() }).passthrough();
 

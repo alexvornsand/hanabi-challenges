@@ -341,6 +341,7 @@ export interface DeferredSlotCount {
 
 export interface ExpandedSection {
   name: string;
+  slug?: string;
   position: number;
   section_type: 'leaf' | 'branch';
   scoring_unit_type: 'individual' | 'team' | 'inferred';
