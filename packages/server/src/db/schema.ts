@@ -1,4 +1,5 @@
 import {
+  AnyPgColumn,
   boolean,
   index,
   integer,
@@ -13,7 +14,7 @@ import {
 // sections — recursive, self-referential. Root sections are events.
 export const sections = pgTable('sections', {
   id: serial('id').primaryKey(),
-  parentId: integer('parent_id').references(() => sections.id), // nullable
+  parentId: integer('parent_id').references((): AnyPgColumn => sections.id), // nullable
   slug: text('slug').unique(), // nullable; root only
   name: text('name').notNull(),
   position: integer('position').notNull().default(0),
