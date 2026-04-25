@@ -39,24 +39,25 @@ function tokenise(src: string): Token[] {
   let i = 0;
 
   while (i < src.length) {
-    if (/\s/.test(src[i])) { i++; continue; }
+    const ch = src[i]!;
+    if (/\s/.test(ch)) { i++; continue; }
     const pos = i;
 
     // Numbers
-    if (/[0-9]/.test(src[i])) {
+    if (/[0-9]/.test(ch)) {
       let num = '';
-      while (i < src.length && /[0-9.eE+\-]/.test(src[i])) num += src[i++];
+      while (i < src.length && /[0-9.eE+\-]/.test(src[i]!)) num += src[i++]!;
       tokens.push({ type: 'number', value: parseFloat(num), pos });
       continue;
     }
 
     // Strings
-    if (src[i] === '"' || src[i] === "'") {
-      const quote = src[i++];
+    if (ch === '"' || ch === "'") {
+      const quote = src[i++]!;
       let str = '';
-      while (i < src.length && src[i] !== quote) {
-        if (src[i] === '\\') { i++; str += src[i++]; }
-        else str += src[i++];
+      while (i < src.length && src[i]! !== quote) {
+        if (src[i]! === '\\') { i++; str += src[i++]!; }
+        else str += src[i++]!;
       }
       i++;
       tokens.push({ type: 'string', value: str, pos });
@@ -64,9 +65,9 @@ function tokenise(src: string): Token[] {
     }
 
     // Identifiers / keywords
-    if (/[a-zA-Z_]/.test(src[i])) {
+    if (/[a-zA-Z_]/.test(ch)) {
       let ident = '';
-      while (i < src.length && /[a-zA-Z_0-9]/.test(src[i])) ident += src[i++];
+      while (i < src.length && /[a-zA-Z_0-9]/.test(src[i]!)) ident += src[i++]!;
       if (ident === 'true') tokens.push({ type: 'bool', value: true, pos });
       else if (ident === 'false') tokens.push({ type: 'bool', value: false, pos });
       else if (ident === 'null') tokens.push({ type: 'null', pos });
@@ -85,7 +86,7 @@ function tokenise(src: string): Token[] {
     if (two === '>=') { tokens.push({ type: 'op', value: '>=', pos }); i += 2; continue; }
 
     // Single-char
-    switch (src[i]) {
+    switch (ch) {
       case '(': tokens.push({ type: 'lparen', pos }); i++; continue;
       case ')': tokens.push({ type: 'rparen', pos }); i++; continue;
       case '[': tokens.push({ type: 'lbracket', pos }); i++; continue;
@@ -287,7 +288,7 @@ function pPostfix(s: PS): ExprNode {
         if (check(s, 'comma')) consume(s);
       }
       consume(s);
-      node = { kind: 'call', name: node.parts[0], args };
+      node = { kind: 'call', name: node.parts[0]!, args };
       continue;
     }
 
@@ -361,7 +362,7 @@ export function parseExpr(expr: string): ExprParseOutcome {
     const tokens = tokenise(expr.trim());
     const s: PS = { tokens, pos: 0, src: expr };
 
-    if (tokens.length === 1 && tokens[0].type === 'eof') {
+    if (tokens.length === 1 && tokens[0]!.type === 'eof') {
       return { ok: false, message: 'Empty expression', expr };
     }
 

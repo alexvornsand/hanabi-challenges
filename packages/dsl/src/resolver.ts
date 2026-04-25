@@ -3,6 +3,7 @@ import type {
   ResolvedConfig,
   ResolvedSection,
   RawSection,
+  GeneratorCall,
   TimeWindow,
   CapturePolicy,
   RegistrationPolicy,
@@ -128,7 +129,7 @@ function resolveSection(section: RawSection, ctx: InheritedContext): ResolvedSec
     resolved.sections = resolved.sections.map((child) => {
       if ('generator' in (child as object)) return child; // GeneratorCall — skip
       return resolveSection(child as RawSection, childCtx);
-    }) as ResolvedSection['sections'];
+    }) as Array<RawSection | GeneratorCall>;
   }
 
   return resolved;

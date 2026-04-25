@@ -33,7 +33,7 @@ describe('parseConfig — error cases', () => {
     const result = parseConfig('event: {name: "test"\n  bad: [');
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      expect(result.diagnostics[0].code).toBe('yaml_syntax_error');
+      expect(result.diagnostics[0]!.code).toBe('yaml_syntax_error');
     }
   });
 
@@ -41,7 +41,7 @@ describe('parseConfig — error cases', () => {
     const result = parseConfig('name: "test"\nslug: "test"\n');
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      expect(result.diagnostics[0].code).toBe('missing_event_key');
+      expect(result.diagnostics[0]!.code).toBe('missing_event_key');
     }
   });
 
@@ -54,7 +54,7 @@ event:
 `);
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      expect(result.diagnostics[0].code).toBe('schema_error');
+      expect(result.diagnostics[0]!.code).toBe('schema_error');
     }
   });
 
@@ -68,7 +68,7 @@ event:
 `);
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      expect(result.diagnostics[0].code).toBe('elimination_bracket_removed');
+      expect(result.diagnostics[0]!.code).toBe('elimination_bracket_removed');
     }
   });
 });

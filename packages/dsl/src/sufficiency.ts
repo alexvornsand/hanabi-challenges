@@ -92,7 +92,7 @@ function collectAdminFields(section: ExpandedSection, path: string, out: Diagnos
 
   // recurse
   for (let i = 0; i < section.sections.length; i++) {
-    collectAdminFields(section.sections[i], `${path}.sections[${i}]`, out);
+    collectAdminFields(section.sections[i]!, `${path}.sections[${i}]`, out);
   }
 }
 

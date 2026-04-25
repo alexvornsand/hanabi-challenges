@@ -200,7 +200,7 @@ async function _issueFromGenerator(
   await db.insert(gameSpecs).values({
     specString: spec,
     sectionId,
-    slotId: newSlot.id,
+    slotId: newSlot!.id,
     slotIndex: nextSlotIndex,
   });
 }

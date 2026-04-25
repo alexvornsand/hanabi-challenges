@@ -20,7 +20,7 @@ export async function teamsRoutes(app: FastifyInstance) {
       .values({ name: body.name.trim() })
       .returning({ id: teams.id, name: teams.name, createdAt: teams.createdAt });
 
-    await db.insert(teamMembers).values({ teamId: team.id, userId: req.userId });
+    await db.insert(teamMembers).values({ teamId: team!.id, userId: req.userId });
 
     return reply.status(201).send({ team });
   });
@@ -127,8 +127,8 @@ export async function teamsRoutes(app: FastifyInstance) {
 
     return reply.send({
       team: {
-        id: teamRows[0].id,
-        name: teamRows[0].name,
+        id: teamRows[0]!.id,
+        name: teamRows[0]!.name,
         members,
       },
     });

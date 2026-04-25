@@ -46,7 +46,7 @@ describe('checkConflicts', () => {
   it('spec in registry → one conflict', () => {
     const conflicts = checkConflicts(['e42w1-g5'], new Set(['e42w1-g5']));
     expect(conflicts).toHaveLength(1);
-    expect(conflicts[0].spec).toBe('e42w1-g5');
+    expect(conflicts[0]!.spec).toBe('e42w1-g5');
   });
 
   it('no conflict when spec not in registry', () => {

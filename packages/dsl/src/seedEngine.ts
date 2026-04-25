@@ -119,7 +119,7 @@ export function issueSpec(
   boundVars: SeedBoundVars,
   _unboundVars: string[],
 ): string {
-  return generateSpecs(pattern, boundVars)[0];
+  return generateSpecs(pattern, boundVars)[0]!;
 }
 
 // ---------------------------------------------------------------------------
@@ -197,8 +197,8 @@ export function validatePattern(
 
   // Check 4: adjacent bare integer variables without separator
   for (let i = 0; i < segments.length - 1; i++) {
-    const curr = segments[i];
-    const next = segments[i + 1];
+    const curr = segments[i]!;
+    const next = segments[i + 1]!;
     if (curr.kind === 'bare' && next.kind === 'bare') {
       diagnostics.push({
         code: 'adjacent_bare_variables',

@@ -29,7 +29,7 @@ export function offsetToLine(lineMap: number[], offset: number): number {
   let hi = lineMap.length - 1;
   while (lo < hi) {
     const mid = Math.ceil((lo + hi) / 2);
-    if (lineMap[mid] <= offset) {
+    if (lineMap[mid]! <= offset) {
       lo = mid;
     } else {
       hi = mid - 1;

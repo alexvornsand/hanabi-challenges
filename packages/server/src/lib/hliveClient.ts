@@ -91,7 +91,7 @@ interface RawVariantFull {
 function parseSeedForVariantId(seed: string): number {
   // Seed format: p{numPlayers}v{variantId}s{suffix}
   const m = seed.match(/v(\d+)/);
-  return m ? parseInt(m[1], 10) : 0;
+  return m ? parseInt(m[1]!, 10) : 0;
 }
 
 function parseTags(raw: string | undefined): string[] {
