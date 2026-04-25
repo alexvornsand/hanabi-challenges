@@ -10,6 +10,11 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/hanabi_test
+      SESSION_SECRET: ci-secret-32-chars-minimum-xxxxxxx
+      NODE_ENV: test
+
     services:
       postgres:
         image: postgres:16
@@ -35,24 +40,12 @@ jobs:
 
       - name: Build packages
         run: pnpm --filter './packages/**' build
-        env:
-          DATABASE_URL: postgres://postgres:postgres@localhost:5432/hanabi_test
-          SESSION_SECRET: ci-secret-32-chars-minimum-xxxxxxx
-          NODE_ENV: test
 
       - name: Migrate database
         run: pnpm --filter @hanabi/server db:migrate
-        env:
-          DATABASE_URL: postgres://postgres:postgres@localhost:5432/hanabi_test
 
       - name: Seed database
         run: pnpm --filter @hanabi/server db:seed
-        env:
-          DATABASE_URL: postgres://postgres:postgres@localhost:5432/hanabi_test
 
       - name: Run tests
         run: pnpm --filter './packages/**' test
-        env:
-          DATABASE_URL: postgres://postgres:postgres@localhost:5432/hanabi_test
-          SESSION_SECRET: ci-secret-32-chars-minimum-xxxxxxx
-          NODE_ENV: test
