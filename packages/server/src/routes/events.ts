@@ -14,6 +14,7 @@ import { runPipeline } from '@hanabi/dsl/src/pipeline.js';
 import { generateSpecs, checkConflicts } from '@hanabi/dsl/src/seedEngine.js';
 import type { VariantInfo, ExpandedSection, ExpandedSlot, SlotSource } from '@hanabi/dsl';
 import { notImplemented } from '../types.js';
+import { onAdminTrigger } from '../lib/slotTriggerEngine.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -459,6 +460,14 @@ export async function eventsRoutes(app: FastifyInstance) {
       setAt,
       setBy: req.userId,
     });
+
+    // Wire trigger-type fields into the slot trigger engine
+    if (
+      fieldSpec.controlType === 'trigger_button' ||
+      fieldSpec.controlType === 'iteration_control'
+    ) {
+      await onAdminTrigger(id, fieldPath, db);
+    }
 
     return reply.send({ ok: true, fieldPath, value, setAt: setAt.toISOString() });
   });
