@@ -5,3 +5,9 @@ declare module 'fastify' {
     userId: number;
   }
 }
+
+declare module '@fastify/session' {
+  interface FastifySessionObject {
+    userId?: number;
+  }
+}

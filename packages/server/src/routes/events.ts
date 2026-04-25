@@ -8,13 +8,15 @@ import {
   warningAcknowledgements,
   variantRegistry,
   adminInputs,
+  users,
 } from '../db/schema.js';
-import { requireAuth, requireOrganiser } from '../middleware/auth.js';
+import { requireAuth, requireOrganiser, requirePlatformOrganiser } from '../middleware/auth.js';
 import { runPipeline } from '@hanabi/dsl/src/pipeline.js';
 import { generateSpecs, checkConflicts } from '@hanabi/dsl/src/seedEngine.js';
 import type { VariantInfo, ExpandedSection, ExpandedSlot, SlotSource } from '@hanabi/dsl';
-import { notImplemented } from '../types.js';
 import { onAdminTrigger } from '../lib/slotTriggerEngine.js';
+import { processAwards } from '../lib/awardEngine.js';
+import { scrapeGames } from '../jobs/scrapeGames.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -185,6 +187,47 @@ export async function eventsRoutes(app: FastifyInstance) {
     return reply.send({ templates: [] });
   });
 
+  // POST /api/admin/events — create new event (platform organiser only)
+  app.post('/api/admin/events', async (req, reply) => {
+    await requirePlatformOrganiser(req, reply, db);
+    if (reply.sent) return;
+
+    const body = req.body as { yaml?: string };
+    if (!body?.yaml) {
+      return reply.status(400).send({ ok: false, error: 'yaml is required', code: 'bad_request' });
+    }
+
+    const variantRows = await db.select().from(variantRegistry).limit(10000);
+    const variantsMap = buildVariantsMap(variantRows);
+
+    const pipeline = await runPipeline(body.yaml, variantsMap);
+
+    const slug = pipeline.parseResult?.raw?.event?.slug ?? null;
+    const name = pipeline.parseResult?.raw?.event?.name ?? 'Untitled';
+
+    const [newSection] = await db
+      .insert(sections)
+      .values({
+        config: { yaml: body.yaml },
+        slug,
+        name,
+        status: 'draft',
+        sectionType: 'branch',
+      })
+      .returning({ id: sections.id, slug: sections.slug });
+
+    await db.insert(eventOrganisers).values({ eventId: newSection!.id, userId: req.userId });
+
+    return reply.status(201).send({
+      ok: true,
+      eventId: newSection!.id,
+      slug: newSection!.slug,
+      diagnostics: pipeline.diagnostics,
+      canSave: pipeline.canSave,
+      canPublish: pipeline.canPublish,
+    });
+  });
+
   // GET /api/admin/events — list events where requester is organiser
   app.get('/api/admin/events', async (req, reply) => {
     await requireAuth(req, reply);
@@ -275,6 +318,32 @@ export async function eventsRoutes(app: FastifyInstance) {
     const variantsMap = buildVariantsMap(variantRows);
 
     const pipeline = await runPipeline(body.yaml, variantsMap);
+
+    // Validate organisers listed in YAML hold platform organiser status
+    const organisersInYaml: string[] = pipeline.parseResult?.raw?.event?.organisers ?? [];
+    if (organisersInYaml.length > 0) {
+      const userRows = await db
+        .select({ displayName: users.displayName, role: users.role })
+        .from(users)
+        .where(inArray(users.displayName, organisersInYaml))
+        .limit(1000);
+      const validOrganisers = new Set(
+        userRows
+          .filter((u) => u.role === 'ADMIN' || u.role === 'SUPERADMIN')
+          .map((u) => u.displayName),
+      );
+      const invalid = organisersInYaml.filter((name) => !validOrganisers.has(name));
+      if (invalid.length > 0) {
+        pipeline.diagnostics.push({
+          code: 'invalid_organiser_account',
+          message: `These display names are not platform organisers: ${invalid.join(', ')}`,
+          severity: 'error',
+          path: 'event.organisers',
+        });
+        pipeline.canSave = false;
+        pipeline.canPublish = false;
+      }
+    }
 
     let eventId: number = id;
     if (pipeline.canSave) {
@@ -513,9 +582,56 @@ export async function eventsRoutes(app: FastifyInstance) {
       }
     }
 
-    return reply.send({ pendingInputs });
+    const scrapeSchedule = (pipeline.expandedConfig?.root as unknown as Record<string, unknown>)?.scrape_schedule as string | undefined;
+
+    return reply.send({ pendingInputs, scrapeSchedule: scrapeSchedule ?? null });
   });
 
-  // POST /api/admin/events/:id/close — stub (ticket 039)
-  app.post('/api/admin/events/:id/close', async (_req, reply) => notImplemented(reply));
+  // POST /api/admin/events/:id/scrape — on-demand scrape trigger
+  app.post('/api/admin/events/:id/scrape', async (req, reply) => {
+    const id = parseInt((req.params as { id: string }).id, 10);
+    if (isNaN(id)) {
+      return reply.status(400).send({ ok: false, error: 'invalid id', code: 'bad_request' });
+    }
+    await requireOrganiser(req, reply, id, db);
+    if (reply.sent) return;
+    const { inserted } = await scrapeGames(db);
+    return reply.send({ ok: true, gamesInserted: inserted });
+  });
+
+  // POST /api/admin/events/:id/close
+  app.post('/api/admin/events/:id/close', async (req, reply) => {
+    const id = parseInt((req.params as { id: string }).id, 10);
+    if (isNaN(id)) {
+      return reply.status(400).send({ ok: false, error: 'invalid id', code: 'bad_request' });
+    }
+
+    await requireOrganiser(req, reply, id, db);
+    if (reply.sent) return;
+
+    const [event] = await db.select().from(sections).where(eq(sections.id, id)).limit(1);
+    if (!event) {
+      return reply.status(404).send({ ok: false, error: 'Not found', code: 'not_found' });
+    }
+    if (event.status !== 'published') {
+      return reply.status(400).send({ ok: false, error: 'Event must be published to close', code: 'not_published' });
+    }
+
+    // Load pipeline for expandedConfig
+    const variantRows = await db.select().from(variantRegistry).limit(10000);
+    const variantsMap = buildVariantsMap(variantRows);
+    const yaml = (event.config as Record<string, unknown>)?.yaml as string ?? '';
+    const pipeline = await runPipeline(yaml, variantsMap);
+
+    // Set status to closed
+    await db.update(sections).set({ status: 'closed', updatedAt: new Date() }).where(eq(sections.id, id));
+
+    // Process awards
+    let awardsIssued = 0;
+    if (pipeline.expandedConfig) {
+      awardsIssued = await processAwards(pipeline.expandedConfig, id, db);
+    }
+
+    return reply.send({ ok: true, awardsIssued });
+  });
 }
