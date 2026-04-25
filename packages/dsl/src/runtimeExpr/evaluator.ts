@@ -356,7 +356,7 @@ export function evalExpr(
     }
 
     case 'crossEvent':
-      // DEFERRED: requires event history system
+      // DEFERRED: see docs/decisions/deferred.md#cross-event-references
       return { ok: false, message: 'cross-event references are deferred — not implemented in V1' };
 
     case 'sectionRef':
