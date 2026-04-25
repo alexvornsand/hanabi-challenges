@@ -1,3 +1,16 @@
+/*
+ * Index coverage audit (Ticket 060 — verified 2026-04-25):
+ *
+ * All three high-frequency queries use index scans:
+ *   1. Scoreboard fetch:   SELECT * FROM games WHERE spec_id IN (...)
+ *      → Bitmap Index Scan on games_spec_id_idx
+ *   2. Spec conflict check: SELECT spec_string FROM game_specs WHERE spec_string = $1
+ *      → Index Only Scan on game_specs_spec_string_idx (covering index)
+ *   3. Division assignments: SELECT * FROM division_assignments WHERE event_id = $1 AND dimension_axis = $2
+ *      → Index Scan on division_assignments_event_axis_idx
+ *
+ * No sequential scans observed. No additional indexes required.
+ */
 import {
   AnyPgColumn,
   boolean,
@@ -10,6 +23,23 @@ import {
   timestamp,
   unique,
 } from 'drizzle-orm/pg-core';
+
+/*
+ * users — defined in apps/api/db/schema.sql
+ * Fields: id, display_name (CITEXT unique), password_hash (nullable for shadow accounts),
+ *         role ('SUPERADMIN'|'ADMIN'|'USER'), color_hex, text_color, discord_id
+ * Platform organiser = role IN ('ADMIN', 'SUPERADMIN')
+ */
+export const users = pgTable('users', {
+  id: serial('id').primaryKey(),
+  displayName: text('display_name').notNull().unique(),
+  passwordHash: text('password_hash'),
+  role: text('role').notNull().default('USER'),
+  colorHex: text('color_hex').notNull().default('#777777'),
+  textColor: text('text_color').notNull().default('#ffffff'),
+  discordId: text('discord_id'),
+  createdAt: timestamp('created_at').defaultNow(),
+});
 
 // sections — recursive, self-referential. Root sections are events.
 export const sections = pgTable('sections', {
