@@ -27,7 +27,7 @@ export async function syncVariantsFromHLive(db: DB): Promise<{ inserted: number;
       });
       inserted++;
     } else {
-      const row = existing[0];
+      const row = existing[0]!;
       if (row.name !== v.name || row.maxScore !== v.maxScore || row.suitCount !== v.suits) {
         await db
           .update(variantRegistry)

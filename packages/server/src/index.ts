@@ -11,6 +11,7 @@ import { authRoutes } from './routes/auth.js';
 import { registrationsRoutes } from './routes/registrations.js';
 import { teamsRoutes } from './routes/teams.js';
 import { scrapeGames } from './jobs/scrapeGames.js';
+import { syncVariantsFromHLive } from './jobs/syncVariants.js';
 import { db } from './db/index.js';
 
 export async function buildServer() {
@@ -58,6 +59,10 @@ if (isMain) {
     // Scrape games every 6 hours
     cron.schedule('0 */6 * * *', () => {
       scrapeGames(db).catch((err) => server.log.error(err, 'scrapeGames failed'));
+    });
+    // Sync variants from H-Live weekly Sunday 2am
+    cron.schedule('0 2 * * 0', () => {
+      syncVariantsFromHLive(db).catch((err) => server.log.error(err, 'syncVariantsFromHLive failed'));
     });
   } catch (err) {
     server.log.error(err);
