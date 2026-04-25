@@ -330,7 +330,7 @@ type ParsedMarkdown = { tree: Root; definitions: DefinitionsMap };
 
 let lastParsed: { markdown: string; parsed: ParsedMarkdown } | null = null;
 function parseMarkdown(markdown: string): ParsedMarkdown {
-  if (lastParsed?.markdown === markdown) return lastParsed.parsed;
+  if (lastParsed !== null && lastParsed.markdown === markdown) return lastParsed.parsed;
 
   const parsedTree = applyTypographyReplacements(
     unified().use(remarkParse).use(remarkGfm).parse(replaceEmojiShortcodes(markdown)) as Root,
@@ -345,6 +345,6 @@ function parseMarkdown(markdown: string): ParsedMarkdown {
 }
 
 export function MarkdownRenderer(props: MarkdownRendererProps) {
-  const { tree, definitions } = parseMarkdown(props.markdown);
+  const { tree, definitions } = parseMarkdown(props.markdown ?? '');
   return <Stack gap={0}>{renderBlocks(tree.children, 'md', definitions)}</Stack>;
 }
