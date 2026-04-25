@@ -18,6 +18,7 @@ vi.mock('../middleware/auth.js', async (importOriginal) => {
     ...orig,
     requireAuth: vi.fn(),
     requireOrganiser: vi.fn(),
+    requirePlatformOrganiser: vi.fn(),
   };
 });
 
@@ -27,7 +28,7 @@ vi.mock('@hanabi/dsl/src/pipeline.js', () => ({
 }));
 
 import { db } from '../db/index.js';
-import { requireAuth, requireOrganiser } from '../middleware/auth.js';
+import { requireAuth, requireOrganiser, requirePlatformOrganiser } from '../middleware/auth.js';
 import { runPipeline } from '@hanabi/dsl/src/pipeline.js';
 
 type MockDb = {
@@ -101,6 +102,22 @@ function mockPassAuth() {
   );
 }
 
+function mockPassPlatformOrganiser() {
+  (requirePlatformOrganiser as ReturnType<typeof vi.fn>).mockImplementation(
+    async (
+      req: { headers: Record<string, string>; userId: number },
+      reply: { status: (n: number) => { send: (v: unknown) => void }; sent: boolean },
+    ) => {
+      const id = req.headers['x-user-id'];
+      if (!id) {
+        reply.status(401).send({ ok: false, error: 'Unauthorized', code: 'unauthorized' });
+        return;
+      }
+      req.userId = parseInt(id, 10);
+    },
+  );
+}
+
 function makePipelineSuccess(overrides: Record<string, unknown> = {}) {
   return {
     canSave: true,
@@ -124,6 +141,7 @@ describe('Events admin routes — Ticket 021 (save / load / publish)', () => {
     vi.resetAllMocks();
     mockPassOrganiser();
     mockPassAuth();
+    mockPassPlatformOrganiser();
     app = await buildServer();
     await app.ready();
   });
@@ -324,6 +342,34 @@ describe('Events admin routes — Ticket 021 (save / load / publish)', () => {
 
     expect(res.statusCode).toBe(403);
   });
+
+  it('POST /api/admin/events — creates event and organiser row → 201', async () => {
+    const mockDb = db as unknown as MockDb;
+
+    mockDb.select.mockReturnValueOnce(makeSelectChain([])); // variantRegistry
+    (runPipeline as ReturnType<typeof vi.fn>).mockResolvedValueOnce(makePipelineSuccess());
+    mockDb.insert
+      .mockReturnValueOnce({
+        values: vi.fn().mockReturnThis(),
+        returning: vi.fn().mockResolvedValue([{ id: 55, slug: 'nvc' }]),
+      })
+      .mockReturnValueOnce({
+        values: vi.fn().mockResolvedValue(undefined),
+      });
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/admin/events',
+      headers: { 'x-user-id': '42', 'content-type': 'application/json' },
+      body: JSON.stringify({ yaml: 'event:\n  name: No Variant Challenge\n  slug: nvc\n' }),
+    });
+
+    expect(res.statusCode).toBe(201);
+    const body = JSON.parse(res.body) as { ok: boolean; eventId: number; slug: string };
+    expect(body.ok).toBe(true);
+    expect(body.eventId).toBe(55);
+    expect(body.slug).toBe('nvc');
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -337,6 +383,7 @@ describe('Events admin routes — Ticket 022 (admin inputs)', () => {
     vi.resetAllMocks();
     mockPassOrganiser();
     mockPassAuth();
+    mockPassPlatformOrganiser();
     app = await buildServer();
     await app.ready();
   });
@@ -471,8 +518,8 @@ describe('Events admin routes — Ticket 022 (admin inputs)', () => {
       }>;
     };
     expect(body.pendingInputs).toHaveLength(1);
-    expect(body.pendingInputs[0].fieldPath).toContain('time_window.start');
-    expect(body.pendingInputs[0].controlType).toBe('datetime');
-    expect(body.pendingInputs[0].isActionable).toBe(true);
+    expect(body.pendingInputs[0]!.fieldPath).toContain('time_window.start');
+    expect(body.pendingInputs[0]!.controlType).toBe('datetime');
+    expect(body.pendingInputs[0]!.isActionable).toBe(true);
   });
 });
