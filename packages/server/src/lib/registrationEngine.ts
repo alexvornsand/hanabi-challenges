@@ -37,7 +37,7 @@ export async function implicitlyRegister(
   }
 
   // Register in the first dimension (primary)
-  const primaryDimension = dimensions[0];
+  const primaryDimension = dimensions[0]!;
   const defaultDivision = primaryDimension.values[0] ?? '';
 
   const rows = participants.map((userId) => ({

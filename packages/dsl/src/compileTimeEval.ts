@@ -31,32 +31,33 @@ function tokenise(src: string): Token[] | null {
   const tokens: Token[] = [];
   let i = 0;
   while (i < src.length) {
+    const ch = src[i]!;
     // Skip whitespace
-    if (/\s/.test(src[i])) { i++; continue; }
+    if (/\s/.test(ch)) { i++; continue; }
 
     // Number
-    if (/[0-9]/.test(src[i]) || (src[i] === '-' && /[0-9]/.test(src[i + 1] ?? ''))) {
+    if (/[0-9]/.test(ch) || (ch === '-' && /[0-9]/.test(src[i + 1] ?? ''))) {
       let num = '';
-      if (src[i] === '-') num += src[i++];
-      while (i < src.length && /[0-9.]/.test(src[i])) num += src[i++];
+      if (src[i]! === '-') num += src[i++]!;
+      while (i < src.length && /[0-9.]/.test(src[i]!)) num += src[i++]!;
       tokens.push({ type: 'number', value: parseFloat(num) });
       continue;
     }
 
     // String literal
-    if (src[i] === '"' || src[i] === "'") {
-      const quote = src[i++];
+    if (ch === '"' || ch === "'") {
+      const quote = src[i++]!;
       let str = '';
-      while (i < src.length && src[i] !== quote) str += src[i++];
+      while (i < src.length && src[i]! !== quote) str += src[i++]!;
       i++; // closing quote
       tokens.push({ type: 'string', value: str });
       continue;
     }
 
     // Identifier / keyword
-    if (/[a-zA-Z_]/.test(src[i])) {
+    if (/[a-zA-Z_]/.test(ch)) {
       let ident = '';
-      while (i < src.length && /[a-zA-Z_0-9]/.test(src[i])) ident += src[i++];
+      while (i < src.length && /[a-zA-Z_0-9]/.test(src[i]!)) ident += src[i++]!;
       if (ident === 'true') tokens.push({ type: 'bool', value: true });
       else if (ident === 'false') tokens.push({ type: 'bool', value: false });
       else tokens.push({ type: 'ident', value: ident });
@@ -72,11 +73,11 @@ function tokenise(src: string): Token[] | null {
     }
 
     // Single-char operators / punctuation
-    if ('+-*/%()<>,'.includes(src[i])) {
-      if (src[i] === '(') tokens.push({ type: 'lparen' });
-      else if (src[i] === ')') tokens.push({ type: 'rparen' });
-      else if (src[i] === ',') tokens.push({ type: 'comma' });
-      else tokens.push({ type: 'op', value: src[i] });
+    if ('+-*/%()<>,'.includes(ch)) {
+      if (ch === '(') tokens.push({ type: 'lparen' });
+      else if (ch === ')') tokens.push({ type: 'rparen' });
+      else if (ch === ',') tokens.push({ type: 'comma' });
+      else tokens.push({ type: 'op', value: ch });
       i++;
       continue;
     }
@@ -219,7 +220,7 @@ function parsePostfix(s: ParseState): number | string | boolean | null {
     }
 
     // Reject identifiers not in env and not known functions
-    if (name in s.env) return s.env[name];
+    if (name in s.env) return s.env[name] ?? null;
 
     // Reject dot access (runtime expr) — already handled by tokeniser returning null for '.'
     return null; // unknown identifier
@@ -234,10 +235,10 @@ function callBuiltin(name: string, args: (number | string | boolean)[]): number 
   if (!KNOWN_FUNCTIONS.has(name)) return null;
   const nums = args as number[];
   switch (name) {
-    case 'pow': return Math.pow(nums[0], nums[1]);
-    case 'ceil': return Math.ceil(nums[0]);
-    case 'floor': return Math.floor(nums[0]);
-    case 'abs': return Math.abs(nums[0]);
+    case 'pow': return Math.pow(nums[0]!, nums[1]!);
+    case 'ceil': return Math.ceil(nums[0]!);
+    case 'floor': return Math.floor(nums[0]!);
+    case 'abs': return Math.abs(nums[0]!);
     default: return null;
   }
 }
@@ -277,15 +278,17 @@ export function interpolate(template: string, env: CompileTimeEnv): CompileTimeO
   const src = template;
 
   while (i < src.length) {
+    const ch = src[i]!;
     // ${expr} form
-    if (src[i] === '$' && src[i + 1] === '{') {
+    if (ch === '$' && src[i + 1] === '{') {
       i += 2;
       let expr = '';
       let depth = 1;
       while (i < src.length && depth > 0) {
-        if (src[i] === '{') depth++;
-        else if (src[i] === '}') { depth--; if (depth === 0) { i++; break; } }
-        expr += src[i++];
+        const c = src[i]!;
+        if (c === '{') depth++;
+        else if (c === '}') { depth--; if (depth === 0) { i++; break; } }
+        expr += src[i++]!;
       }
       const outcome = evaluateCompileTime(expr, env);
       if (!outcome.ok) return outcome;
@@ -294,10 +297,10 @@ export function interpolate(template: string, env: CompileTimeEnv): CompileTimeO
     }
 
     // $name form
-    if (src[i] === '$' && /[a-zA-Z_]/.test(src[i + 1] ?? '')) {
+    if (ch === '$' && /[a-zA-Z_]/.test(src[i + 1] ?? '')) {
       i++;
       let name = '';
-      while (i < src.length && /[a-zA-Z_0-9]/.test(src[i])) name += src[i++];
+      while (i < src.length && /[a-zA-Z_0-9]/.test(src[i]!)) name += src[i++]!;
       if (!(name in env)) {
         return { ok: false, code: 'compile_time_expr_invalid', message: `Unknown variable: ${name}`, expr: template };
       }
@@ -305,7 +308,7 @@ export function interpolate(template: string, env: CompileTimeEnv): CompileTimeO
       continue;
     }
 
-    result += src[i++];
+    result += src[i++]!;
   }
 
   return { ok: true, value: result };

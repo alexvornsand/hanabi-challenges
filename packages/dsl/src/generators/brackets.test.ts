@@ -133,13 +133,13 @@ describe('stepladder', () => {
   it('4 units → 3 step sections', () => {
     const sections = stepladder(PARAMS, 4);
     expect(sections).toHaveLength(3);
-    expect(sections[0].name).toBe('Step1');
-    expect(sections[2].name).toBe('Step3');
+    expect(sections[0]!.name).toBe('Step1');
+    expect(sections[2]!.name).toBe('Step3');
   });
 
   it('final step has assigned_rank routing', () => {
     const sections = stepladder(PARAMS, 4);
-    const final = sections[sections.length - 1];
+    const final = sections[sections.length - 1]!;
     expect(final.routing?.rank_1).toEqual({ assigned_rank: 1 });
   });
 });

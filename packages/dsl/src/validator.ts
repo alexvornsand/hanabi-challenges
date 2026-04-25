@@ -264,7 +264,7 @@ function checkSection(
 
   // Recurse
   for (let i = 0; i < section.sections.length; i++) {
-    checkSection(section.sections[i], false, section, diags, `${path}.sections[${i}]`);
+    checkSection(section.sections[i]!, false, section, diags, `${path}.sections[${i}]`);
   }
 }
 

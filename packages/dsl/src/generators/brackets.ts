@@ -193,10 +193,10 @@ export function stepladder(params: BracketParams, unitCount: number): ExpandedSe
 // ---------------------------------------------------------------------------
 
 export interface RoundRobinParams extends BracketParams {
-  win_points?: number;
-  draw_points?: number;
-  loss_points?: number;
-  tiebreakers?: string[];
+  win_points?: number | undefined;
+  draw_points?: number | undefined;
+  loss_points?: number | undefined;
+  tiebreakers?: string[] | undefined;
 }
 
 export function roundRobin(params: RoundRobinParams, unitCount: number): ExpandedSection[] {

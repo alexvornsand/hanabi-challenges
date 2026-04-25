@@ -182,37 +182,37 @@ export interface Award {
   name: string;
   predicate: string | object;
   badge: BadgeConfig;
-  when?: string;
+  when?: string | undefined;
 }
 
 // Scoreboard
 export interface RankByClause {
   primary: { expr: string; direction: 'ascending' | 'descending' };
-  tiebreakers?: Array<{ expr: string; direction: 'ascending' | 'descending'; visible?: string }>;
+  tiebreakers?: Array<{ expr: string; direction: 'ascending' | 'descending'; visible?: string | undefined }> | undefined;
 }
 export interface Column {
   label: string;
   value: string;
-  visible?: string;
-  sortable?: boolean;
-  for_each?: string;
+  visible?: string | undefined;
+  sortable?: boolean | undefined;
+  for_each?: string | undefined;
 }
 export interface RowStyle {
   predicate: string;
-  when?: string;
+  when?: string | undefined;
   label: string;
   accent: ColourToken;
-  priority?: number;
+  priority?: number | undefined;
 }
 export interface Scoreboard {
   name: string;
-  primary?: boolean;
-  featured?: string;
+  primary?: boolean | undefined;
+  featured?: string | undefined;
   scope: string;
-  filter?: string;
+  filter?: string | undefined;
   rank_by: RankByClause;
   columns: Column[];
-  row_styles?: RowStyle[];
+  row_styles?: RowStyle[] | undefined;
 }
 
 // Dimension
@@ -221,14 +221,14 @@ export interface Dimension {
   axis: 'player_count_class' | 'convention_system' | 'skill_tier' | 'format';
   values: string[];
   registration_cardinality: RegistrationCardinality;
-  division_count?: number | string;
+  division_count?: number | string | undefined;
 }
 
 // Absence & P/R
 export interface AbsencePolicy {
   demotion: string;
-  floor?: string | 'bottom' | null;
-  overflow?: 'waiting_list' | 'unranked' | 'discard';
+  floor?: string | 'bottom' | null | undefined;
+  overflow?: 'waiting_list' | 'unranked' | 'discard' | undefined;
 }
 export interface PromotionRelegation {
   fn: 'carry_balanced' | string;
@@ -236,23 +236,23 @@ export interface PromotionRelegation {
   standard_promotions: number | string;
   standard_relegations: number | string;
   bottom_division: string | 'dynamic';
-  clamp?: boolean;
+  clamp?: boolean | undefined;
 }
 
 // Raw config
 export interface SlotConfig {
-  seed_pattern?: string;
-  assignment_trigger?: 'eager' | 'lazy';
-  lazy_trigger?: 'completion' | 'action' | AdminSentinel;
-  missing_score_default?: number;
-  attempt_modifier?: AttemptModifier;
-  validity_rules?: ValidityRule[];
-  time_window?: TimeWindow;
+  seed_pattern?: string | undefined;
+  assignment_trigger?: 'eager' | 'lazy' | undefined;
+  lazy_trigger?: 'completion' | 'action' | AdminSentinel | undefined;
+  missing_score_default?: number | undefined;
+  attempt_modifier?: AttemptModifier | undefined;
+  validity_rules?: ValidityRule[] | undefined;
+  time_window?: TimeWindow | undefined;
 }
 
 export interface GeneratorDeclaration {
   returns: 'slot' | 'list[slot]' | 'section' | 'list[section]' | 'scoreboard' | 'badge';
-  params?: Record<string, string>;
+  params?: Record<string, string> | undefined;
   value: unknown;
 }
 
@@ -262,30 +262,30 @@ export interface GeneratorCall {
 }
 
 export interface RawSection {
-  name?: string;
-  slug?: string;
-  start?: string | AdminSentinel;
-  organisers?: string[];
-  dimensions?: Dimension[];
-  absence_policy?: AbsencePolicy;
-  promotion_relegation?: PromotionRelegation;
-  scoring_unit_type?: 'individual' | 'team' | 'inferred';
-  classification_rule?: string;
-  unit_attribution?: 'share' | 'split';
-  aggregation_function?: AggregationFunction;
-  non_participant_result?: string;
-  advancement?: Advancement;
-  matchmaking?: Matchmaking;
-  time_window?: TimeWindow;
-  capture_policy?: CapturePolicy;
-  registration_policy?: RegistrationPolicy;
-  visibility_policy?: VisibilityPolicy;
-  awards?: Award[];
-  scoreboards?: Scoreboard[];
-  conditional_activation?: string;
-  routing?: RoutingBlock;
-  sections?: Array<RawSection | GeneratorCall>;
-  slots?: Array<SlotConfig | GeneratorCall>;
+  name?: string | undefined;
+  slug?: string | undefined;
+  start?: string | AdminSentinel | undefined;
+  organisers?: string[] | undefined;
+  dimensions?: Dimension[] | undefined;
+  absence_policy?: AbsencePolicy | undefined;
+  promotion_relegation?: PromotionRelegation | undefined;
+  scoring_unit_type?: 'individual' | 'team' | 'inferred' | undefined;
+  classification_rule?: string | undefined;
+  unit_attribution?: 'share' | 'split' | undefined;
+  aggregation_function?: AggregationFunction | undefined;
+  non_participant_result?: string | undefined;
+  advancement?: Advancement | undefined;
+  matchmaking?: Matchmaking | undefined;
+  time_window?: TimeWindow | undefined;
+  capture_policy?: CapturePolicy | undefined;
+  registration_policy?: RegistrationPolicy | undefined;
+  visibility_policy?: VisibilityPolicy | undefined;
+  awards?: Award[] | undefined;
+  scoreboards?: Scoreboard[] | undefined;
+  conditional_activation?: string | undefined;
+  routing?: RoutingBlock | undefined;
+  sections?: Array<RawSection | GeneratorCall> | undefined;
+  slots?: Array<SlotConfig | GeneratorCall> | undefined;
 }
 
 export interface RawEvent extends RawSection {
@@ -305,8 +305,8 @@ export interface Diagnostic {
   code: string;
   severity: DiagnosticSeverity;
   message: string;
-  path?: string;
-  line?: number;
+  path?: string | undefined;
+  line?: number | undefined;
 }
 
 // Pipeline outcomes
@@ -341,32 +341,32 @@ export interface DeferredSlotCount {
 
 export interface ExpandedSection {
   name: string;
-  slug?: string;
+  slug?: string | undefined;
   position: number;
   section_type: 'leaf' | 'branch';
   scoring_unit_type: 'individual' | 'team' | 'inferred';
-  classification_rule?: string;
-  unit_attribution?: 'share' | 'split';
-  aggregation_function?: AggregationFunction;
+  classification_rule?: string | undefined;
+  unit_attribution?: 'share' | 'split' | undefined;
+  aggregation_function?: AggregationFunction | undefined;
   non_participant_result: string;
   time_window: TimeWindow;
   capture_policy: CapturePolicy;
   registration_policy: RegistrationPolicy;
   visibility_policy: VisibilityPolicy;
-  conditional_activation?: string;
-  advancement?: Advancement;
+  conditional_activation?: string | undefined;
+  advancement?: Advancement | undefined;
   matchmaking: Matchmaking;
   awards: Award[];
   scoreboards: Scoreboard[];
-  routing?: RoutingBlock;
+  routing?: RoutingBlock | undefined;
   sections: ExpandedSection[];
   slots: SlotSource[];
-  deferred_slot_count?: DeferredSlotCount;
+  deferred_slot_count?: DeferredSlotCount | undefined;
   // root-only fields — present on root section, error if on child sections
-  organisers?: string[];
-  dimensions?: Dimension[];
-  absence_policy?: AbsencePolicy;
-  promotion_relegation?: PromotionRelegation;
+  organisers?: string[] | undefined;
+  dimensions?: Dimension[] | undefined;
+  absence_policy?: AbsencePolicy | undefined;
+  promotion_relegation?: PromotionRelegation | undefined;
 }
 
 export interface ExpandedConfig {
@@ -415,11 +415,11 @@ export interface SeedPatternContext {
   hasMultiRegistration: boolean;
 }
 export interface SeedBoundVars {
-  eventID?: number;
-  sectionID?: number;
-  slotIndex?: number;
-  teamID?: number;
-  attemptID?: number;
+  eventID?: number | undefined;
+  sectionID?: number | undefined;
+  slotIndex?: number | undefined;
+  teamID?: number | undefined;
+  attemptID?: number | undefined;
 }
 export interface SeedConflict {
   spec: string;
@@ -482,19 +482,19 @@ export interface ComputedScoreboard {
 export interface GameResult {
   points: number;
   max_score: boolean;
-  points_star?: number;
-  bdr?: number;
-  turn_count?: number;
-  strikes?: number;
-  datetime_start?: string;
-  datetime_end?: string;
-  elapsed_time?: number;
-  end_condition?: string;
-  variant?: VariantInfo;
+  points_star?: number | undefined;
+  bdr?: number | undefined;
+  turn_count?: number | undefined;
+  strikes?: number | undefined;
+  datetime_start?: string | undefined;
+  datetime_end?: string | undefined;
+  elapsed_time?: number | undefined;
+  end_condition?: string | undefined;
+  variant?: VariantInfo | undefined;
   participants: number[];
-  spec?: string;
-  source?: 'scraped' | 'submitted';
-  tags?: string[];
+  spec?: string | undefined;
+  source?: 'scraped' | 'submitted' | undefined;
+  tags?: string[] | undefined;
 }
 
 export interface SlotResultSnapshot {

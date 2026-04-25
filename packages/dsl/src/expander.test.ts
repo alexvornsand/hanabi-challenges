@@ -25,7 +25,7 @@ event:
             seed_pattern: 'NVC{i}'
 `;
     const expanded = buildExpanded(yaml);
-    const section = expanded.root.sections[0];
+    const section = expanded.root.sections[0]!;
     expect(section).toBeDefined();
     const leafSlots = section.slots.filter((s) => !('kind' in s));
     expect(leafSlots).toHaveLength(100);
@@ -48,7 +48,7 @@ event:
           trigger: admin
 `;
     const expanded = buildExpanded(yaml);
-    const section = expanded.root.sections[0];
+    const section = expanded.root.sections[0]!;
     const deferred = section.slots.find((s) => 'kind' in s);
     expect(deferred).toBeDefined();
     if (deferred && 'kind' in deferred) {
@@ -69,7 +69,7 @@ event:
           trigger: attempt_start
 `;
     const expanded = buildExpanded(yaml);
-    const section = expanded.root.sections[0];
+    const section = expanded.root.sections[0]!;
     const deferred = section.slots.find((s) => 'kind' in s);
     expect(deferred).toBeDefined();
     if (deferred && 'kind' in deferred) {
@@ -89,7 +89,7 @@ event:
           count: admin
 `;
     const expanded = buildExpanded(yaml);
-    const section = expanded.root.sections[0];
+    const section = expanded.root.sections[0]!;
     const deferred = section.slots.find((s) => 'kind' in s);
     expect(deferred).toBeDefined();
     if (deferred && 'kind' in deferred) {
@@ -114,7 +114,7 @@ event:
             seed_pattern: 'R\${ceil(i / 2)}'
 `;
     const expanded = buildExpanded(yaml);
-    const section = expanded.root.sections[0];
+    const section = expanded.root.sections[0]!;
     const slot = section.slots[0] as { seed_pattern: string };
     expect(slot.seed_pattern).toBe('R1');
   });
@@ -184,11 +184,11 @@ event:
         - seed_pattern: 'p2v0sNVC3'
 `;
     const expanded = buildExpanded(yaml);
-    const section = expanded.root.sections[0];
+    const section = expanded.root.sections[0]!;
     expect(section.slots).toHaveLength(3);
     const slots = section.slots as Array<{ seed_pattern: string; slot_index: number }>;
-    expect(slots[0].slot_index).toBe(1);
-    expect(slots[1].slot_index).toBe(2);
-    expect(slots[2].slot_index).toBe(3);
+    expect(slots[0]!.slot_index).toBe(1);
+    expect(slots[1]!.slot_index).toBe(2);
+    expect(slots[2]!.slot_index).toBe(3);
   });
 });

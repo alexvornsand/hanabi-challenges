@@ -18,7 +18,7 @@ export async function fetchMaterialIconNames(): Promise<Set<string>> {
     const text = await res.text();
     const names = new Set<string>();
     for (const line of text.split('\n')) {
-      const name = line.split(' ')[0].trim();
+      const name = line.split(' ')[0]?.trim() ?? '';
       if (name) names.add(name);
     }
     cachedIcons = names;
