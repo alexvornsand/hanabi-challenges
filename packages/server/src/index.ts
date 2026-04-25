@@ -2,6 +2,7 @@ import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import cookie from '@fastify/cookie';
 import session from '@fastify/session';
+import cron from 'node-cron';
 import { config } from './config.js';
 import { eventsRoutes } from './routes/events.js';
 import { adminRoutes } from './routes/admin.js';
@@ -9,6 +10,8 @@ import { publicRoutes } from './routes/public.js';
 import { authRoutes } from './routes/auth.js';
 import { registrationsRoutes } from './routes/registrations.js';
 import { teamsRoutes } from './routes/teams.js';
+import { scrapeGames } from './jobs/scrapeGames.js';
+import { db } from './db/index.js';
 
 export async function buildServer() {
   const fastify = Fastify({
@@ -52,6 +55,10 @@ if (isMain) {
   const server = await buildServer();
   try {
     await server.listen({ port: config.PORT, host: '0.0.0.0' });
+    // Scrape games every 6 hours
+    cron.schedule('0 */6 * * *', () => {
+      scrapeGames(db).catch((err) => server.log.error(err, 'scrapeGames failed'));
+    });
   } catch (err) {
     server.log.error(err);
     process.exit(1);
