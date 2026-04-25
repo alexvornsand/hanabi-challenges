@@ -126,10 +126,10 @@ const builtins: PredicateDefinition[] = [
     name: 'lineup_valid',
     contextType: 'game',
     params: {},
-    // DEFERRED: requires roster history
+    // DEFERRED: see docs/decisions/deferred.md#lineup_valid-predicate
     nativeEquivalent: 'all participants are on roster at time of play',
     fn: (_ctx, _args) => {
-      // DEFERRED: requires roster history
+      // DEFERRED: see docs/decisions/deferred.md#lineup_valid-predicate
       return true;
     },
   },
