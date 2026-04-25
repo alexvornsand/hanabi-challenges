@@ -309,9 +309,9 @@ const slotConfigSchema = z.object({
 
 const generatorCallSchema = z.object({ generator: z.string() }).passthrough();
 
-// Forward declaration for recursive section
-type RawSectionInput = z.infer<typeof rawSectionSchema>;
-const rawSectionSchema: z.ZodType<RawSectionInput> = z.lazy(() =>
+// Forward declaration for recursive section (z.ZodType<unknown> avoids the circular self-reference)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const rawSectionSchema: z.ZodType<any> = z.lazy(() =>
   z.object({
     name: z.string().optional(),
     slug: z.string().optional(),
