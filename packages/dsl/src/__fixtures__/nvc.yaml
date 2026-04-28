@@ -1,0 +1,56 @@
+event:
+  name: No Variant Challenge
+  slug: nvc
+  dimensions:
+    - axis: player_count_class
+      values: ['2p', '3-4p', '5-6p']
+      registration_cardinality: multiple
+  registration_policy:
+    implicit: true
+    explicit: true
+  capture_policy:
+    scrape: true
+    submit: true
+  scoring_unit_type: team
+  aggregation_function:
+    reduce: sum
+    over: slots
+    value: 'item.score'
+  sections:
+    - name: Main
+      scoring_unit_type: team
+      aggregation_function:
+        reduce: count
+        over: slots
+        where: 'item.score == 25'
+      slots:
+        - seed_pattern: 'p{playerCount}v0sNVC{slotIndex*}'
+          missing_score_default: 0
+          validity_rules:
+            - predicate: 'unit.score == 25'
+  awards:
+    - name: any%
+      predicate: 'unit.score >= 1'
+      badge:
+        primary_text: any%
+        colour: bronze
+    - name: 70%
+      predicate: 'unit.score >= 70'
+      badge:
+        primary_text: 70%
+        colour: silver
+    - name: 80%
+      predicate: 'unit.score >= 80'
+      badge:
+        primary_text: 80%
+        colour: gold
+    - name: 90%
+      predicate: 'unit.score >= 90'
+      badge:
+        primary_text: 90%
+        colour: platinum
+    - name: 100%
+      predicate: 'unit.score == 100'
+      badge:
+        primary_text: 100%
+        colour: diamond

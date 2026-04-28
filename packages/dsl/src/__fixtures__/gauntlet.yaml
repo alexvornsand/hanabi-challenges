@@ -1,0 +1,22 @@
+event:
+  name: Mix Gauntlet
+  slug: mix-gauntlet
+  registration_policy:
+    explicit: true
+  capture_policy:
+    submit: true
+  scoring_unit_type: team
+  aggregation_function:
+    fn: derived_ranking
+    score: 'unit.best_attempt_score'
+  sections:
+    - name: Gauntlet
+      scoring_unit_type: team
+      aggregation_function:
+        reduce: max
+        over: attempts
+        value: 'item.total_points'
+      slots:
+        - seed_pattern: 'p{playerCount}v{variantID}s{teamID}a{attemptID*}'
+          assignment_trigger: lazy
+          lazy_trigger: completion

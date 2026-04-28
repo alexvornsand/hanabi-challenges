@@ -17,6 +17,6 @@ describe('App', () => {
 
   it('renders landing page copy', () => {
     render(<App />);
-    expect(screen.getByRole('heading', { name: /hanabi competitions/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /hanabi competitions/i })).toBeTruthy();
   });
 });

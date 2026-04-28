@@ -1,0 +1,51 @@
+name: Hanabi Platform CI
+
+on:
+  push:
+    branches: ['feat/hanabi-platform', 'feat/hanabi-*']
+  pull_request:
+    branches: ['main']
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/hanabi_test
+      SESSION_SECRET: ci-secret-32-chars-minimum-xxxxxxx
+      NODE_ENV: test
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: hanabi_test
+        options: >-
+          --health-cmd pg_isready --health-interval 10s
+          --health-timeout 5s --health-retries 5
+        ports: ['5432:5432']
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build packages
+        run: pnpm --filter './packages/**' build
+
+      - name: Migrate database
+        run: pnpm --filter @hanabi/server db:migrate
+
+      - name: Seed database
+        run: pnpm --filter @hanabi/server db:seed
+
+      - name: Run tests
+        run: pnpm --filter './packages/**' test

@@ -1,0 +1,37 @@
+{
+  "name": "@hanabi/server",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch --env-file=.env src/index.ts",
+    "build": "tsc",
+    "test": "vitest run",
+    "db:generate": "drizzle-kit generate:pg",
+    "db:migrate": "drizzle-kit push:pg",
+    "db:seed": "tsx src/db/seeds/run.ts",
+    "db:sync-variants": "tsx src/jobs/syncVariants.ts"
+  },
+  "dependencies": {
+    "@fastify/cookie": "^9.3.0",
+    "@fastify/cors": "^9.0.0",
+    "@fastify/session": "^10.8.0",
+    "@fastify/static": "^7.0.0",
+    "@hanabi/dsl": "workspace:*",
+    "bcryptjs": "^3.0.3",
+    "drizzle-orm": "^0.30.0",
+    "fastify": "^4.26.0",
+    "node-cron": "^3.0.3",
+    "postgres": "^3.4.0",
+    "zod": "^3.22.0"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^3.0.0",
+    "@types/node": "^24.10.15",
+    "@types/node-cron": "^3.0.11",
+    "drizzle-kit": "^0.20.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.4.0",
+    "vitest": "^1.4.0"
+  }
+}
