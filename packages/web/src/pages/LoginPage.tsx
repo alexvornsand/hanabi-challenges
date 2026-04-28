@@ -23,7 +23,7 @@ export function LoginPage() {
     setSubmitting(true);
     try {
       const data = await apiPost<LoginResponse>('/api/auth/login', {
-        displayName,
+        display_name: displayName,
         password,
       });
       setUser({
