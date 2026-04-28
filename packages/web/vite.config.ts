@@ -5,5 +5,11 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 5173,
+    proxy: {
+      '/reference': {
+        target: 'http://localhost:3002',
+        changeOrigin: true,
+      },
+    },
   },
 });

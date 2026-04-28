@@ -2,8 +2,15 @@ import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import cookie from '@fastify/cookie';
 import session from '@fastify/session';
+import fastifyStatic from '@fastify/static';
 import cron from 'node-cron';
+import { createRequire } from 'module';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { config } from './config.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const _require = createRequire(import.meta.url);
 import { eventsRoutes } from './routes/events.js';
 import { adminRoutes } from './routes/admin.js';
 import { publicRoutes } from './routes/public.js';
@@ -35,6 +42,16 @@ export async function buildServer() {
       sameSite: 'lax',
     },
   });
+
+  // Reference docs (production: serve built Docusaurus output)
+  if (config.NODE_ENV === 'production') {
+    const referenceRoot = path.resolve(__dirname, '../../../reference/build');
+    await fastify.register(fastifyStatic, {
+      root: referenceRoot,
+      prefix: '/reference/',
+      decorateReply: false,
+    });
+  }
 
   // Health check
   fastify.get('/health', async () => ({ status: 'ok' }));

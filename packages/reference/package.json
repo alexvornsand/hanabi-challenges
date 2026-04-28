@@ -1,0 +1,21 @@
+{
+  "name": "@hanabi/reference",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "docusaurus start --port 3002 --no-open",
+    "build": "docusaurus build",
+    "serve": "docusaurus serve --port 3002"
+  },
+  "dependencies": {
+    "@docusaurus/core": "^3.7.0",
+    "@docusaurus/preset-classic": "^3.7.0",
+    "clsx": "^2.0.0",
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0"
+  },
+  "devDependencies": {
+    "@docusaurus/types": "^3.7.0",
+    "typescript": "^5.4.0"
+  }
+}
