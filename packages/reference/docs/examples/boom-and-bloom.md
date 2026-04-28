@@ -1,5 +1,4 @@
 ---
-id: boom-and-bloom
 title: Boom and Bloom
 sidebar_position: 2
 ---

@@ -1,5 +1,4 @@
 ---
-id: nvc
 title: No Variant Challenge
 sidebar_position: 1
 ---

@@ -1,5 +1,4 @@
 ---
-id: intro
 title: Introduction
 sidebar_position: 1
 slug: /
@@ -7,19 +6,22 @@ slug: /
 
 # Hanabi Challenges — Reference
 
-This reference covers everything you need to configure and run events on the Hanabi Challenges platform.
+Event configuration is written in YAML using the Hanabi DSL. Every event config has two possible top-level keys:
 
-## What is the DSL?
+```yaml
+event:   # required — defines the event
+  ...
 
-Event configuration is written in YAML using the Hanabi DSL — a declarative format for describing how an event is structured, scored, and displayed.
+generators:  # optional — reusable slot templates
+  ...
+```
 
-A minimal event looks like this:
+## Minimal example
 
 ```yaml
 event:
   name: My Event
   slug: my-event
-  scoring_unit_type: individual
   sections:
     - name: Main
       aggregation_function:
@@ -30,19 +32,9 @@ event:
         - seed_pattern: 'p2v0s{eventID}g{slotIndex*}'
 ```
 
-## Structure
-
-An event config has three top-level concerns:
-
-| Section | Purpose |
-|---|---|
-| **`event`** | Identity, dimensions, registration and capture policies |
-| **`sections`** | One or more competition phases, each with their own scoring and slots |
-| **`generators`** | Reusable slot templates for bracket or ladder structures |
-
 ## Navigation
 
-- **[Fields](dsl/fields)** — every YAML field, its type, and its default
-- **[Expressions](dsl/expressions)** — the expression language used in predicates and computed values
-- **[Generators](dsl/generators)** — how bracket and sequence generators work
+- **[event](event/)** — the root config object; all fields, sub-objects, and children
+- **[generators](generators/)** — reusable slot and section templates
+- **[Expressions](expressions)** — the expression language used in predicates, aggregations, and computed values
 - **[Examples](examples/nvc)** — annotated real-world event configs
