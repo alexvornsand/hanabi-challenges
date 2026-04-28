@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Button, Group, Tabs, Text, Modal, Checkbox, Stack, Tooltip } from '@mantine/core';
+import { Anchor, Button, Group, Tabs, Text, Modal, Checkbox, Stack, Tooltip } from '@mantine/core';
 import { YamlEditor } from '../components/YamlEditor';
 import { DiagnosticsPanel } from '../components/DiagnosticsPanel';
 import { CompiledPreview } from '../components/CompiledPreview';
@@ -389,6 +389,17 @@ export function EventEditorPage() {
           <Tabs.Tab value="visual" disabled title="Coming soon">
             Visual Editor
           </Tabs.Tab>
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', paddingRight: 12 }}>
+            <Anchor
+              href="/reference"
+              target="_blank"
+              rel="noopener noreferrer"
+              size="sm"
+              fw={500}
+            >
+              Reference
+            </Anchor>
+          </div>
         </Tabs.List>
       </Tabs>
 

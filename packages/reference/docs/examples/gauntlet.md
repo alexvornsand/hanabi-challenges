@@ -1,5 +1,4 @@
 ---
-id: gauntlet
 title: Mix Gauntlet
 sidebar_position: 3
 ---
